@@ -1,0 +1,226 @@
+/* Глобальные стили CodeFlow с динамическими темами */
+
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&display=swap');
+
+* {
+  font-family: 'JetBrains Mono', monospace;
+}
+
+/* ======= ЭФФЕКТ ГЛИТЧА (ИСПОЛЬЗУЕТ CSS-ПЕРЕМЕННУЮ) ======= */
+.glitch {
+  position: relative;
+  color: var(--neon-green, #00FF41);
+  animation: glitch-skew 1s infinite;
+}
+
+.glitch::before,
+.glitch::after {
+  content: attr(data-text);
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.glitch::before {
+  left: 2px;
+  text-shadow: -2px 0 #ff00de;
+  clip: rect(24px, 550px, 90px, 0);
+  animation: glitch-anim 3s infinite linear alternate-reverse;
+}
+
+.glitch::after {
+  left: -2px;
+  text-shadow: -2px 0 #00fff9;
+  clip: rect(85px, 550px, 140px, 0);
+  animation: glitch-anim 2.5s infinite linear alternate-reverse;
+}
+
+@keyframes glitch-anim {
+  0% { clip: rect(61px, 9999px, 52px, 0); }
+  10% { clip: rect(94px, 9999px, 35px, 0); }
+  20% { clip: rect(43px, 9999px, 71px, 0); }
+  30% { clip: rect(12px, 9999px, 88px, 0); }
+  40% { clip: rect(77px, 9999px, 26px, 0); }
+  50% { clip: rect(38px, 9999px, 104px, 0); }
+  60% { clip: rect(90px, 9999px, 15px, 0); }
+  70% { clip: rect(25px, 9999px, 66px, 0); }
+  80% { clip: rect(55px, 9999px, 99px, 0); }
+  90% { clip: rect(70px, 9999px, 41px, 0); }
+  100% { clip: rect(33px, 9999px, 82px, 0); }
+}
+
+@keyframes glitch-skew {
+  0% { transform: skew(0deg); }
+  10% { transform: skew(1deg); }
+  20% { transform: skew(0deg); }
+  30% { transform: skew(-1deg); }
+  40% { transform: skew(0deg); }
+  50% { transform: skew(0.5deg); }
+  60% { transform: skew(0deg); }
+  70% { transform: skew(-0.5deg); }
+  80% { transform: skew(0deg); }
+  90% { transform: skew(1deg); }
+  100% { transform: skew(0deg); }
+}
+
+/* ======= ТРЯСКА ЭКРАНА ПРИ ОШИБКЕ ======= */
+.shake-screen {
+  animation: shake 0.5s;
+}
+
+@keyframes shake {
+  0%, 100% { transform: translate(0, 0); }
+  10%, 30%, 50%, 70%, 90% { transform: translate(-5px, 0); }
+  20%, 40%, 60%, 80% { transform: translate(5px, 0); }
+}
+
+/* ======= НЕОНОВОЕ СВЕЧЕНИЕ (ДИНАМИЧЕСКОЕ) ======= */
+.neon-text, .neon-glow {
+  color: var(--neon-green, #00ff41);
+  text-shadow: 
+    0 0 5px var(--neon-green, #00ff41),
+    0 0 10px var(--neon-green, #00ff41),
+    0 0 20px var(--neon-green, #00ff41),
+    0 0 40px var(--neon-green, #00ff41);
+  animation: neon-flicker 1.5s infinite alternate;
+}
+
+@keyframes neon-flicker {
+  0%, 19%, 21%, 23%, 25%, 54%, 56%, 100% {
+    text-shadow:
+      0 0 5px var(--neon-green, #00ff41),
+      0 0 10px var(--neon-green, #00ff41),
+      0 0 20px var(--neon-green, #00ff41),
+      0 0 40px var(--neon-green, #00ff41);
+  }
+  20%, 24%, 55% {
+    text-shadow: none;
+  }
+}
+
+/* ======= КНОПКИ С ДИНАМИЧЕСКИМ СВЕЧЕНИЕМ ======= */
+button:hover {
+  box-shadow: 0 0 15px var(--neon-green, rgba(0, 255, 65, 0.5)) !important;
+  transform: translateY(-2px);
+  transition: all 0.2s;
+}
+
+button:active {
+  transform: translateY(0);
+}
+
+/* ======= ТЕРМИНАЛЬНЫЙ КУРСОР ======= */
+.terminal-cursor::after {
+  content: '█';
+  animation: blink 1s step-end infinite;
+  color: var(--neon-green, #00ff41);
+}
+
+@keyframes blink {
+  0%, 50% { opacity: 1; }
+  51%, 100% { opacity: 0; }
+}
+
+/* ======= ПРОКРУТКА С ДИНАМИЧЕСКИМ ЦВЕТОМ ======= */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #0a0a0a;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--neon-green, #00ff41);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--neon-green, #00cc33);
+  box-shadow: 0 0 10px var(--neon-green, rgba(0,255,65,0.8));
+}
+
+/* ======= АНИМАЦИЯ ПОЯВЛЕНИЯ ======= */
+.fade-in {
+  animation: fadeIn 0.5s ease-in;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* ======= КАРТОЧКИ С ЭФФЕКТОМ HOVER ======= */
+.cyber-card {
+  transition: all 0.3s ease;
+  border: 1px solid transparent;
+}
+
+.cyber-card:hover {
+  border-color: var(--neon-green, #00ff41);
+  box-shadow: 0 0 20px var(--neon-green, rgba(0, 255, 65, 0.2));
+  transform: translateY(-5px);
+}
+
+/* ======= КРАСНЫЙ РЕЖИМ ДЛЯ БОССОВ ======= */
+.boss-mode {
+  animation: red-pulse 2s infinite;
+}
+
+@keyframes red-pulse {
+  0%, 100% { 
+    box-shadow: 0 0 10px rgba(255, 0, 0, 0.3);
+  }
+  50% { 
+    box-shadow: 0 0 30px rgba(255, 0, 0, 0.8);
+  }
+}
+
+/* ======= ТИПОГРАФИЯ ======= */
+h1, h2, h3, h4, h5, h6 {
+  letter-spacing: 0.05em;
+}
+
+code, pre {
+  font-family: 'JetBrains Mono', monospace !important;
+  background: #0a0a0a;
+  padding: 2px 6px;
+  border-radius: 3px;
+  border: 1px solid #1a1a1a;
+}
+
+/* ======= БЕЙДЖИ С ДИНАМИЧЕСКИМ СВЕЧЕНИЕМ ======= */
+.badge-glow {
+  box-shadow: 0 0 10px var(--neon-green, currentColor);
+  animation: pulse-glow 2s infinite;
+}
+
+@keyframes pulse-glow {
+  0%, 100% { box-shadow: 0 0 5px var(--neon-green, currentColor); }
+  50% { box-shadow: 0 0 15px var(--neon-green, currentColor); }
+}
+
+/* ======= ДИНАМИЧЕСКИЙ КУРСОР (ЧЕРЕЗ CSS-ПЕРЕМЕННУЮ) ======= */
+* {
+  cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'%3E%3Ctext x='0' y='20' font-family='monospace' font-size='20' fill='%2300ff41'%3E▸%3C/text%3E%3C/svg%3E"), auto;
+}
+
+button, a {
+  cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'%3E%3Ctext x='0' y='20' font-family='monospace' font-size='20' fill='%2300ff41'%3E⬢%3C/text%3E%3C/svg%3E"), pointer;
+}
+
+/* Для boss mode */
+[data-boss-mode="true"] * {
+  cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'%3E%3Ctext x='0' y='20' font-family='monospace' font-size='20' fill='%23ff0000'%3E▸%3C/text%3E%3C/svg%3E"), auto;
+}
+
+/* ======= АДАПТИВ ======= */
+@media (max-width: 768px) {
+  .glitch::before,
+  .glitch::after {
+    display: none; /* Упрощаем на мобилках */
+  }
+}

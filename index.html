@@ -1,0 +1,593 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#0a0a0a" />
+    <meta name="description" content="CodeFlow - Взломай систему. Освой Python. Стань легендой." />
+    
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Orbitron:wght@400;700;900&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+
+    <!-- Pyodide для выполнения Python в браузере -->
+    <script src="https://cdn.jsdelivr.net/pyodide/v0.23.4/full/pyodide.js"></script>
+    
+    <title>CodeFlow Terminal | BREACH IN PROGRESS...</title>
+
+    <style>
+      /* ========================================
+         ГЛОБАЛЬНЫЕ ПЕРЕМЕННЫЕ И СБРОС
+      ======================================== */
+      :root {
+        --neon-green: #00FF41;
+        --neon-cyan: #00FFF9;
+        --neon-pink: #FF00C1;
+        --neon-red: #FF4136;
+        --dark-bg: #050505;
+        --darker-bg: #0a0a0a;
+        --terminal-green: #33ff33;
+        --glitch-delay: 5s;
+      }
+
+      * {
+        box-sizing: border-box;
+        -webkit-font-smoothing: antialiased;
+        -moz-osx-font-smoothing: grayscale;
+      }
+
+      html, body, #root {
+        height: 100%;
+        margin: 0;
+        padding: 0;
+        background-color: var(--dark-bg);
+        color: #C1C2C5;
+        font-family: 'JetBrains Mono', 'Share Tech Mono', monospace;
+        overflow: hidden;
+        cursor: crosshair; /* Хакерский курсор */
+      }
+
+      /* ========================================
+         ЗАГРУЗОЧНЫЙ ЭКРАН (BOOT SEQUENCE)
+      ======================================== */
+      #boot-screen {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: #000;
+        color: var(--neon-green);
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        z-index: 99999;
+        font-family: 'Share Tech Mono', monospace;
+        animation: fadeOut 2s 3s forwards;
+      }
+
+      #boot-screen.hidden {
+        display: none;
+      }
+
+      .boot-text {
+        font-size: 14px;
+        margin: 5px 0;
+        opacity: 0;
+        animation: bootLine 0.3s forwards;
+      }
+
+      .boot-text:nth-child(1) { animation-delay: 0s; }
+      .boot-text:nth-child(2) { animation-delay: 0.3s; }
+      .boot-text:nth-child(3) { animation-delay: 0.6s; }
+      .boot-text:nth-child(4) { animation-delay: 0.9s; }
+      .boot-text:nth-child(5) { animation-delay: 1.2s; }
+      .boot-text:nth-child(6) { animation-delay: 1.5s; }
+      .boot-text:nth-child(7) { animation-delay: 1.8s; }
+      .boot-text:nth-child(8) { animation-delay: 2.1s; }
+
+      @keyframes bootLine {
+        from { opacity: 0; transform: translateX(-20px); }
+        to { opacity: 1; transform: translateX(0); }
+      }
+
+      @keyframes fadeOut {
+        to { opacity: 0; pointer-events: none; }
+      }
+
+      .boot-logo {
+        font-size: 48px;
+        font-weight: 900;
+        font-family: 'Orbitron', sans-serif;
+        margin-bottom: 30px;
+        text-shadow: 0 0 10px var(--neon-green), 0 0 20px var(--neon-green);
+        animation: logoGlitch 0.5s infinite;
+      }
+
+      @keyframes logoGlitch {
+        0%, 90%, 100% { transform: translate(0); }
+        92% { transform: translate(-2px, 2px); }
+        94% { transform: translate(2px, -2px); }
+        96% { transform: translate(-2px, -2px); }
+      }
+
+      /* ========================================
+         SCANLINES (ЭФФЕКТ СТАРОГО МОНИТОРА)
+      ======================================== */
+      body::before {
+        content: " ";
+        display: block;
+        position: fixed;
+        top: 0; left: 0; 
+        width: 100%; height: 100%;
+        background: 
+          linear-gradient(
+            rgba(18, 16, 16, 0) 50%, 
+            rgba(0, 0, 0, 0.25) 50%
+          ),
+          linear-gradient(
+            90deg, 
+            rgba(255, 0, 0, 0.06), 
+            rgba(0, 255, 0, 0.02), 
+            rgba(0, 0, 255, 0.06)
+          );
+        background-size: 100% 2px, 3px 100%;
+        z-index: 9998;
+        pointer-events: none;
+        opacity: 0.3;
+      }
+
+      /* ========================================
+         МЕРЦАНИЕ ЭКРАНА (FLICKER)
+      ======================================== */
+      body::after {
+        content: " ";
+        display: block;
+        position: fixed;
+        top: 0; left: 0; 
+        width: 100%; height: 100%;
+        background: rgba(18, 16, 16, 0.1);
+        opacity: 0;
+        z-index: 9999;
+        pointer-events: none;
+        animation: flicker 0.15s infinite;
+      }
+
+      @keyframes flicker {
+        0% { opacity: 0.1; }
+        50% { opacity: 0.02; }
+        100% { opacity: 0.08; }
+      }
+
+      /* ========================================
+         ВИНЬЕТКА (ЗАТЕМНЕНИЕ ПО КРАЯМ)
+      ======================================== */
+      #root::before {
+        content: "";
+        position: fixed;
+        top: 0; left: 0;
+        width: 100%; height: 100%;
+        box-shadow: inset 0 0 150px rgba(0, 0, 0, 0.8);
+        pointer-events: none;
+        z-index: 9997;
+      }
+
+      /* ========================================
+         КАСТОМНЫЙ СКРОЛЛБАР
+      ======================================== */
+      ::-webkit-scrollbar { 
+        width: 8px; 
+        height: 8px;
+      }
+      
+      ::-webkit-scrollbar-track { 
+        background: #101113; 
+        border-radius: 4px;
+      }
+      
+      ::-webkit-scrollbar-thumb { 
+        background: linear-gradient(180deg, #2f9e44, #40c057);
+        border-radius: 4px;
+        box-shadow: 0 0 6px rgba(0, 255, 65, 0.5);
+      }
+      
+      ::-webkit-scrollbar-thumb:hover { 
+        background: linear-gradient(180deg, #40c057, #51cf66);
+        box-shadow: 0 0 10px rgba(0, 255, 65, 0.8);
+      }
+
+      /* ========================================
+         ГЛИТЧ-ЭФФЕКТ ДЛЯ ТЕКСТА
+      ======================================== */
+      .glitch {
+        position: relative;
+        display: inline-block;
+        color: var(--neon-green);
+      }
+
+      .glitch::before, 
+      .glitch::after {
+        content: attr(data-text);
+        position: absolute;
+        top: 0; left: 0; 
+        width: 100%; height: 100%;
+        background: transparent;
+      }
+
+      .glitch::before {
+        left: 2px;
+        text-shadow: -3px 0 var(--neon-pink);
+        clip: rect(44px, 450px, 56px, 0);
+        animation: glitch-anim var(--glitch-delay) infinite linear alternate-reverse;
+      }
+
+      .glitch::after {
+        left: -2px;
+        text-shadow: -3px 0 var(--neon-cyan);
+        clip: rect(44px, 450px, 56px, 0);
+        animation: glitch-anim2 var(--glitch-delay) infinite linear alternate-reverse;
+      }
+
+      @keyframes glitch-anim {
+        0% { clip: rect(31px, 9999px, 94px, 0); transform: skew(0.3deg); }
+        10% { clip: rect(112px, 9999px, 63px, 0); transform: skew(0.1deg); }
+        20% { clip: rect(85px, 9999px, 27px, 0); transform: skew(0.8deg); }
+        30% { clip: rect(18px, 9999px, 140px, 0); transform: skew(0.5deg); }
+        40% { clip: rect(99px, 9999px, 45px, 0); transform: skew(0.2deg); }
+        50% { clip: rect(52px, 9999px, 107px, 0); transform: skew(0.9deg); }
+        60% { clip: rect(71px, 9999px, 33px, 0); transform: skew(0.4deg); }
+        70% { clip: rect(5px, 9999px, 123px, 0); transform: skew(0.7deg); }
+        80% { clip: rect(88px, 9999px, 11px, 0); transform: skew(0.6deg); }
+        90% { clip: rect(41px, 9999px, 76px, 0); transform: skew(0.3deg); }
+        100% { clip: rect(64px, 9999px, 55px, 0); transform: skew(0deg); }
+      }
+
+      @keyframes glitch-anim2 {
+        0% { clip: rect(77px, 9999px, 22px, 0); }
+        20% { clip: rect(133px, 9999px, 8px, 0); }
+        40% { clip: rect(44px, 9999px, 99px, 0); }
+        60% { clip: rect(11px, 9999px, 144px, 0); }
+        80% { clip: rect(66px, 9999px, 37px, 0); }
+        100% { clip: rect(92px, 9999px, 61px, 0); }
+      }
+
+      /* ========================================
+         ТРЯСКА ЭКРАНА ПРИ ОШИБКЕ (SHAKE)
+      ======================================== */
+      @keyframes shake-intense {
+        0% { transform: translate(0, 0) rotate(0deg); }
+        10% { transform: translate(-5px, -3px) rotate(-2deg); }
+        20% { transform: translate(-3px, 0px) rotate(1deg); }
+        30% { transform: translate(5px, 3px) rotate(0deg); }
+        40% { transform: translate(1px, -2px) rotate(2deg); }
+        50% { transform: translate(-2px, 4px) rotate(-1deg); }
+        60% { transform: translate(-4px, 1px) rotate(1deg); }
+        70% { transform: translate(3px, 2px) rotate(-2deg); }
+        80% { transform: translate(-1px, -2px) rotate(1deg); }
+        90% { transform: translate(2px, 1px) rotate(0deg); }
+        100% { transform: translate(0, 0) rotate(0deg); }
+      }
+
+      .shake-screen {
+        animation: shake-intense 0.6s cubic-bezier(.36,.07,.19,.97) both;
+        filter: 
+          sepia(0.8) 
+          saturate(5) 
+          hue-rotate(-50deg) 
+          brightness(1.2)
+          contrast(1.5);
+      }
+
+      /* ========================================
+         КРАСНЫЙ РЕЖИМ (BOSS MODE)
+      ======================================== */
+      .boss-mode-overlay {
+        position: fixed;
+        top: 0; left: 0;
+        width: 100%; height: 100%;
+        background: radial-gradient(circle, rgba(255, 0, 0, 0.1), rgba(255, 0, 0, 0.3));
+        pointer-events: none;
+        z-index: 9996;
+        animation: redPulse 2s infinite;
+        opacity: 0;
+        transition: opacity 0.5s;
+      }
+
+      .boss-mode-overlay.active {
+        opacity: 1;
+      }
+
+      @keyframes redPulse {
+        0%, 100% { background: radial-gradient(circle, rgba(255, 0, 0, 0.1), rgba(255, 0, 0, 0.2)); }
+        50% { background: radial-gradient(circle, rgba(255, 0, 0, 0.3), rgba(255, 0, 0, 0.5)); }
+      }
+
+      /* ========================================
+         СТАТИЧЕСКИЕ ПОМЕХИ (NOISE)
+      ======================================== */
+      #noise {
+        position: fixed;
+        top: 0; left: 0;
+        width: 100%; height: 100%;
+        pointer-events: none;
+        z-index: 9995;
+        opacity: 0.03;
+        background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 400 400' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='2' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
+        animation: noise 0.2s infinite;
+      }
+
+      @keyframes noise {
+        0%, 100% { transform: translate(0, 0); }
+        10% { transform: translate(-5%, -5%); }
+        20% { transform: translate(-10%, 5%); }
+        30% { transform: translate(5%, -10%); }
+        40% { transform: translate(-5%, 15%); }
+        50% { transform: translate(-10%, 5%); }
+        60% { transform: translate(15%, 0%); }
+        70% { transform: translate(0%, 10%); }
+        80% { transform: translate(-15%, 0%); }
+        90% { transform: translate(10%, 5%); }
+      }
+
+      /* ========================================
+         НЕОНОВОЕ СВЕЧЕНИЕ
+      ======================================== */
+      .neon-glow {
+        text-shadow: 
+          0 0 5px var(--neon-green),
+          0 0 10px var(--neon-green),
+          0 0 20px var(--neon-green),
+          0 0 40px var(--neon-green),
+          0 0 80px var(--neon-green);
+        animation: neon-flicker 1.5s infinite alternate;
+      }
+
+      @keyframes neon-flicker {
+        0%, 19%, 21%, 23%, 25%, 54%, 56%, 100% {
+          text-shadow:
+            0 0 5px var(--neon-green),
+            0 0 10px var(--neon-green),
+            0 0 20px var(--neon-green),
+            0 0 40px var(--neon-green);
+        }
+        20%, 24%, 55% {
+          text-shadow: none;
+        }
+      }
+
+      /* ========================================
+         ТЕРМИНАЛЬНЫЙ КУРСОР
+      ======================================== */
+      .terminal-cursor::after {
+        content: '█';
+        animation: blink 1s step-end infinite;
+        color: var(--neon-green);
+      }
+
+      @keyframes blink {
+        0%, 50% { opacity: 1; }
+        51%, 100% { opacity: 0; }
+      }
+
+      /* ========================================
+         ЗАГРУЗОЧНЫЙ ИНДИКАТОР
+      ======================================== */
+      .loading-bar {
+        width: 300px;
+        height: 4px;
+        background: #222;
+        border-radius: 2px;
+        overflow: hidden;
+        margin-top: 20px;
+      }
+
+      .loading-bar-inner {
+        height: 100%;
+        background: linear-gradient(90deg, var(--neon-green), var(--neon-cyan));
+        animation: loading 2s ease-in-out infinite;
+        box-shadow: 0 0 10px var(--neon-green);
+      }
+
+      @keyframes loading {
+        0% { width: 0%; }
+        50% { width: 100%; }
+        100% { width: 0%; }
+      }
+
+      /* ========================================
+         КНОПКИ С КИБЕРПАНК-ЭФФЕКТОМ
+      ======================================== */
+      button {
+        cursor: pointer;
+        transition: all 0.3s ease;
+        position: relative;
+        overflow: hidden;
+      }
+
+      button::before {
+        content: '';
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        width: 0;
+        height: 0;
+        border-radius: 50%;
+        background: rgba(0, 255, 65, 0.3);
+        transform: translate(-50%, -50%);
+        transition: width 0.6s, height 0.6s;
+      }
+
+      button:hover::before {
+        width: 300px;
+        height: 300px;
+      }
+
+      button:hover {
+        box-shadow: 0 0 20px rgba(0, 255, 65, 0.6) !important;
+        transform: translateY(-2px);
+      }
+
+      button:active {
+        transform: translateY(0);
+      }
+
+      /* ========================================
+         МАТРИЧНЫЙ ДОЖДЬ (ОПЦИОНАЛЬНО)
+      ======================================== */
+      #matrix-rain {
+        position: fixed;
+        top: 0; left: 0;
+        width: 100%; height: 100%;
+        pointer-events: none;
+        z-index: 1;
+        opacity: 0.05;
+      }
+
+      /* ========================================
+         ПОЛЬЗОВАТЕЛЬСКИЕ ПЕРЕМЕННЫЕ
+      ======================================== */
+      [data-boss-mode="true"] {
+        --neon-green: #FF4136;
+        --terminal-green: #ff3333;
+      }
+
+      /* ========================================
+         АНИМАЦИЯ ПОЯВЛЕНИЯ
+      ======================================== */
+      @keyframes fadeInUp {
+        from { 
+          opacity: 0; 
+          transform: translateY(30px); 
+        }
+        to { 
+          opacity: 1; 
+          transform: translateY(0); 
+        }
+      }
+
+      .fade-in-up {
+        animation: fadeInUp 0.6s ease-out;
+      }
+
+      /* ========================================
+         ХАКЕРСКИЙ КУРСОР
+      ======================================== */
+      * {
+        cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'%3E%3Ctext x='0' y='20' font-family='monospace' font-size='20' fill='%2300ff41'%3E▸%3C/text%3E%3C/svg%3E"), auto;
+      }
+
+      button, a {
+        cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'%3E%3Ctext x='0' y='20' font-family='monospace' font-size='20' fill='%2300ff41'%3E⬢%3C/text%3E%3C/svg%3E"), pointer;
+      }
+
+      /* ========================================
+         RESPONSIVE
+      ======================================== */
+      @media (max-width: 768px) {
+        body::before,
+        body::after {
+          display: none; /* Убираем тяжелые эффекты на мобилках */
+        }
+        
+        #noise {
+          opacity: 0.01;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <!-- ЗАГРУЗОЧНЫЙ ЭКРАН -->
+    <div id="boot-screen">
+      <div class="boot-logo">⬡ CODEFLOW ⬡</div>
+      <div class="boot-text">> INITIALIZING SYSTEM...</div>
+      <div class="boot-text">> LOADING KERNEL MODULES... [OK]</div>
+      <div class="boot-text">> ESTABLISHING ENCRYPTED CONNECTION... [OK]</div>
+      <div class="boot-text">> BYPASSING FIREWALL... [OK]</div>
+      <div class="boot-text">> LOADING PYTHON ENVIRONMENT... [OK]</div>
+      <div class="boot-text">> INJECTING AI ASSISTANT (GLITCH)... [OK]</div>
+      <div class="boot-text">> STARTING OPERATION 'SILENT STORM'...</div>
+      <div class="boot-text" style="color: #00ff41; margin-top: 20px;">✓ SYSTEM READY. WELCOME, OPERATIVE.</div>
+      <div class="loading-bar">
+        <div class="loading-bar-inner"></div>
+      </div>
+    </div>
+
+    <!-- КРАСНЫЙ ОВЕРЛЕЙ ДЛЯ БОСС-РЕЖИМА -->
+    <div class="boss-mode-overlay" id="boss-overlay"></div>
+
+    <!-- СТАТИЧЕСКИЕ ПОМЕХИ -->
+    <div id="noise"></div>
+
+    <!-- CANVAS ДЛЯ МАТРИЧНОГО ДОЖДЯ (опционально) -->
+    <canvas id="matrix-rain"></canvas>
+
+    <!-- ОСНОВНОЕ ПРИЛОЖЕНИЕ -->
+    <div id="root"></div>
+
+    <script type="module" src="/src/main.tsx"></script>
+
+    <!-- СКРИПТ ДЛЯ BOOT SCREEN И ЭФФЕКТОВ -->
+    <script>
+      // Скрываем boot screen через 5 секунд
+      setTimeout(() => {
+        const bootScreen = document.getElementById('boot-screen');
+        if (bootScreen) {
+          bootScreen.classList.add('hidden');
+        }
+      }, 5000);
+
+      // Активируем boss overlay через события
+      window.addEventListener('boss-mode-on', () => {
+        document.getElementById('boss-overlay').classList.add('active');
+      });
+
+      window.addEventListener('boss-mode-off', () => {
+        document.getElementById('boss-overlay').classList.remove('active');
+      });
+
+      // Опциональный матричный дождь
+      const canvas = document.getElementById('matrix-rain');
+      const ctx = canvas.getContext('2d');
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+
+      const chars = '01アイウエオカキクケコサシスセソタチツテト';
+      const fontSize = 14;
+      const columns = canvas.width / fontSize;
+      const drops = [];
+
+      for (let i = 0; i < columns; i++) {
+        drops[i] = Math.random() * canvas.height / fontSize;
+      }
+
+      function drawMatrix() {
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.05)';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        
+        ctx.fillStyle = '#00ff41';
+        ctx.font = fontSize + 'px monospace';
+
+        for (let i = 0; i < drops.length; i++) {
+          const text = chars[Math.floor(Math.random() * chars.length)];
+          ctx.fillText(text, i * fontSize, drops[i] * fontSize);
+
+          if (drops[i] * fontSize > canvas.height && Math.random() > 0.975) {
+            drops[i] = 0;
+          }
+          drops[i]++;
+        }
+      }
+
+      setInterval(drawMatrix, 50);
+
+      // Resize handler
+      window.addEventListener('resize', () => {
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+      });
+    </script>
+  </body>
+</html>
