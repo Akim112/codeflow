@@ -1,7 +1,13 @@
 // Утилита для генерации "компьютерного" звука через код (Web Audio API)
+const getAudioContext = () => {
+  const Ctx = window.AudioContext ?? (window as Window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+  return Ctx ? new Ctx() : null;
+};
+
 const playSynthSound = (freq: number, type: OscillatorType, duration: number) => {
   try {
-    const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
+    const audioCtx = getAudioContext();
+    if (!audioCtx) return;
     const oscillator = audioCtx.createOscillator();
     const gainNode = audioCtx.createGain();
 
@@ -42,7 +48,8 @@ export const sounds = {
   // Исправленная сирена
   siren: () => {
     try {
-      const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
+      const audioCtx = getAudioContext();
+      if (!audioCtx) return;
       const oscillator = audioCtx.createOscillator();
       const gainNode = audioCtx.createGain();
 

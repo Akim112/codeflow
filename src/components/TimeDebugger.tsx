@@ -5,7 +5,7 @@ import { IconPlayerSkipForward, IconReload, IconBug } from '@tabler/icons-react'
 interface DebugStep {
   line: number;
   code: string;
-  variables: Record<string, any>;
+  variables: Record<string, unknown>;
   lastChangedVar: string | null;
   output: string;
 }
@@ -23,7 +23,7 @@ export const TimeDebugger = ({ code, onClose }: TimeDebuggerProps) => {
   const generateSteps = (sourceCode: string): DebugStep[] => {
     const lines = sourceCode.split('\n').map(l => l.trim()).filter(l => l && !l.startsWith('#'));
     const debugSteps: DebugStep[] = [];
-    let currentVars: Record<string, any> = {};
+    let currentVars: Record<string, unknown> = {};
     let currentOutput = '';
 
     lines.forEach((line, idx) => {
@@ -68,10 +68,8 @@ export const TimeDebugger = ({ code, onClose }: TimeDebuggerProps) => {
         const match = line.match(/for (\w+) in range\((\d+)(?:,\s*(\d+))?(?:,\s*(-?\d+))?\)/);
         if (match) {
           const varName = match[1];
-          const start = match[2] ? parseInt(match[2]) : 0;
-          const stop = match[3] ? parseInt(match[3]) : parseInt(match[2]);
-          const step = match[4] ? parseInt(match[4]) : 1;
-          
+          const start = match[2] ? parseInt(match[2], 10) : 0;
+
           currentVars = { ...currentVars, [varName]: start };
           lastChangedVar = varName;
         }
@@ -90,19 +88,19 @@ export const TimeDebugger = ({ code, onClose }: TimeDebuggerProps) => {
   };
 
   // Вычисление f-строк: f'Try: {i}'
-  const evaluateFString = (fstr: string, scope: Record<string, any>): string => {
+  const evaluateFString = (fstr: string, scope: Record<string, unknown>): string => {
     // Убираем f' и '
-    let template = fstr.slice(2, -1);
-    
+    const template = fstr.slice(2, -1);
+
     // Заменяем {переменная} на значения
     const regex = /{([^}]+)}/g;
-    return template.replace(regex, (_, varName) => {
+    return template.replace(regex, (_match, varName: string) => {
       return scope[varName.trim()] !== undefined ? String(scope[varName.trim()]) : `{${varName}}`;
     });
   };
 
   // Вычисление Python-выражений
-  const evaluatePythonExpression = (expr: string, scope: Record<string, any>) => {
+  const evaluatePythonExpression = (expr: string, scope: Record<string, unknown>) => {
     const keys = Object.keys(scope);
     const values = Object.values(scope);
     

@@ -4,7 +4,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import confetti from 'canvas-confetti';
 import { 
   Button, Title, Text, Paper, Group, Badge, Notification, 
-  Stack, Center, Box, Collapse, Tooltip, ActionIcon, Tabs 
+  Stack, Center, Box, Collapse, ActionIcon, Tabs 
 } from '@mantine/core';
 import { 
   IconBulb, IconClock, IconRocket, IconTerminal, IconFileCode, IconReload, IconAlertTriangle 
@@ -25,7 +25,9 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { sounds } from '../utils/audio';
 
 declare global {
-  interface Window { loadPyodide: any; }
+  interface Window {
+    loadPyodide?: () => Promise<{ runPythonAsync: (code: string) => Promise<void>; setStdout: (opts: { batched: (msg: string) => void }) => void }>;
+  }
 }
 
 const LessonPage = () => {
@@ -43,7 +45,6 @@ const LessonPage = () => {
   const [glitchState, setGlitchState] = useState(createGlitchState({ type: 'welcome' }));
   const [notification, setNotification] = useState<{ type: 'success' | 'fail' | null, message: string }>({ type: null, message: '' });
   const [showDebugger, setShowDebugger] = useState(false);
-  const [showHint, setShowHint] = useState(false);
   const [moralModalOpened, setMoralModalOpened] = useState(false); 
   
   const [timeLeft, setTimeLeft] = useState<number | null>(null);
@@ -140,15 +141,16 @@ const LessonPage = () => {
 
       const interval = setInterval(() => { sounds.type(); }, 80);
       const timer = setTimeout(() => { clearInterval(interval); }, 1500);
-      
-      return () => { 
-        clearInterval(interval); 
-        clearTimeout(timer); 
-        music.stop(); 
+
+      return () => {
+        clearInterval(interval);
+        clearTimeout(timer);
+        music.stop();
         window.dispatchEvent(new Event('boss-mode-off'));
         document.body.removeAttribute('data-boss-mode');
       };
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- run only when lessonId/isBossMode change
   }, [lessonId, isBossMode]);
 
   const handleRunUpdated = async () => {
@@ -203,8 +205,8 @@ const LessonPage = () => {
         let achievementMessage = "";
         const stats = { completedCount: completed.length, completedIds: completed, totalXP: Number(localStorage.getItem('userXP')) };
         const unlockedRaw = localStorage.getItem('unlockedAchievements');
-        let unlocked: string[] = unlockedRaw ? JSON.parse(unlockedRaw) : [];
-        
+        const unlocked: string[] = unlockedRaw ? JSON.parse(unlockedRaw) : [];
+
         achievements.forEach(ach => {
           if (!unlocked.includes(ach.id) && ach.condition(stats)) {
             unlocked.push(ach.id);
@@ -233,12 +235,12 @@ const LessonPage = () => {
         setNotification({ type: 'fail', message: 'ВЗЛОМ ПРЕРВАН: Неверный результат.' });
         music.start('ambient');
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       sounds.error();
       setIsError(true);
       setErrorCount(prev => prev + 1);
       setGlitchState(createGlitchState({ type: 'error', isError: true, errorCount: errorCount + 1 }));
-      setOutput(`> СИСТЕМНЫЙ СБОЙ:\n${err.message}`);
+      setOutput(`> СИСТЕМНЫЙ СБОЙ:\n${err instanceof Error ? err.message : String(err)}`);
       setNotification({ type: 'fail', message: 'КРИТИЧЕСКАЯ ОШИБКА В КОДЕ!' });
       music.start('ambient');
     } finally {

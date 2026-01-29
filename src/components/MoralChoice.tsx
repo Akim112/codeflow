@@ -1,4 +1,4 @@
-import { Modal, Button, Title, Text, Stack, Group } from '@mantine/core';
+import { Modal, Button, Title, Text, Stack } from '@mantine/core';
 import { addReputation } from '../data/reputationSystem';
 
 interface Props {

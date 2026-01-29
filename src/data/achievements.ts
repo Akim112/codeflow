@@ -3,7 +3,7 @@ export interface Achievement {
   title: string;
   description: string;
   icon: string;
-  condition: (stats: any) => boolean;
+  condition: (stats: { completedCount: number; completedIds: number[]; totalXP: number }) => boolean;
 }
 
 export const achievements: Achievement[] = [

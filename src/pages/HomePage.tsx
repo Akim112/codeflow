@@ -1,4 +1,4 @@
-import { Container, Title, Text, Button, Group, Stack, SimpleGrid, Card, Badge } from '@mantine/core';
+import { Container, Title, Text, Button, Stack, SimpleGrid, Card, Badge } from '@mantine/core';
 import { Link } from 'react-router-dom';
 import { Typewriter } from 'react-simple-typewriter';
 import { IconRocket, IconTrophy, IconShoppingCart, IconUser } from '@tabler/icons-react';

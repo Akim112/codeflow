@@ -8,8 +8,9 @@ class AdaptiveMusic {
 
   constructor() {
     try {
-      this.audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
-    } catch (e) {
+      const Ctx = window.AudioContext ?? (window as Window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+      this.audioContext = Ctx ? new Ctx() : null;
+    } catch {
       console.warn('Audio not supported');
     }
   }
@@ -43,7 +44,9 @@ class AdaptiveMusic {
     this.oscillators.forEach(osc => {
       try {
         osc.stop();
-      } catch {}
+      } catch {
+        // osc may already be stopped
+      }
     });
     this.oscillators = [];
     this.gainNodes = [];
@@ -113,7 +116,7 @@ class AdaptiveMusic {
     const now = this.audioContext.currentTime;
     const freqs = [110, 138.59, 164.81]; // Минорный аккорд
 
-    freqs.forEach((freq, i) => {
+    freqs.forEach((freq) => {
       const osc = this.audioContext!.createOscillator();
       const gain = this.audioContext!.createGain();
 

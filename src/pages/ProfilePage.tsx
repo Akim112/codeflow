@@ -2,22 +2,15 @@ import { Container, Title, Text, Paper, Group, RingProgress, Stack, Button, Badg
 import { Link } from 'react-router-dom';
 import { useEffect, useState } from 'react';
 import { achievements } from '../data/achievements';
-import { factions, getReputation, isFactionUnlocked, type ReputationState } from '../data/reputationSystem';
+import { factions, getReputation, isFactionUnlocked } from '../data/reputationSystem';
 
 const ProfilePage = () => {
   const [xp, setXp] = useState(0);
   const [unlockedIds, setUnlockedIds] = useState<string[]>([]);
-  const [reputation, setReputation] = useState<ReputationState>({});
 
   useEffect(() => {
     setXp(Number(localStorage.getItem('userXP')) || 0);
     setUnlockedIds(JSON.parse(localStorage.getItem('unlockedAchievements') || '[]'));
-    
-    // Загружаем репутацию
-    const savedRep = localStorage.getItem('reputation');
-    if (savedRep) {
-      setReputation(JSON.parse(savedRep));
-    }
   }, []);
 
   // Логика рангов
