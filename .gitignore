@@ -1,6 +1,0 @@
-node_modules/
-bin/obj/
-.env
-dist/
-*.log
-.DS_Store
