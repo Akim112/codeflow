@@ -1,15 +1,15 @@
 import { Container, Title, Text, Paper, Group, RingProgress, Stack, Button, Badge, SimpleGrid, Progress, Divider, ThemeIcon } from '@mantine/core';
 import { Link } from 'react-router-dom';
 import { useEffect, useState } from 'react';
-import { IconTrophy, IconFlame, IconClock, IconShoppingCart, IconChartBar } from '@tabler/icons-react';
+import { IconTrophy, IconFlame, IconShoppingCart, IconChartBar } from '@tabler/icons-react';
 import { achievements, calculateStats } from '../data/achievements';
 import { factions, getReputation, isFactionUnlocked, type ReputationState } from '../data/reputationSystem';
 
 const ProfilePage = () => {
   const [xp, setXp] = useState(0);
   const [unlockedIds, setUnlockedIds] = useState<string[]>([]);
-  const [reputation, setReputation] = useState<ReputationState>({});
-  const [stats, setStats] = useState<any>({});
+  const [, setReputation] = useState<ReputationState>({});
+  const [, setStats] = useState<ReturnType<typeof calculateStats>>({} as ReturnType<typeof calculateStats>);
 
   useEffect(() => {
     setXp(Number(localStorage.getItem('userXP')) || 0);

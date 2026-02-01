@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Text, type MantineStyleProp } from '@mantine/core';
+import { Text } from '@mantine/core';
 import type { TextProps } from '@mantine/core';
 
 interface GlitchTextProps extends Omit<TextProps, 'style'> {

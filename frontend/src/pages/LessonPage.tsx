@@ -28,7 +28,9 @@ import { pyodideWorkerScript } from '../utils/workerScript';
 const Editor = lazy(() => import('@monaco-editor/react'));
 
 declare global {
-  interface Window { loadPyodide: any; }
+  interface Window {
+    loadPyodide?: (options?: { fullStdLib?: boolean }) => Promise<{ runPythonAsync: (code: string) => Promise<unknown>; setStdout: (cfg: { batched?: (msg: string) => void }) => void }>;
+  }
 }
 
 const LessonPage = () => {
@@ -55,7 +57,7 @@ const LessonPage = () => {
   const [typingProgress, setTypingProgress] = useState(0);
 
   // Ref для отслеживания активных запросов к воркеру
-  const pendingRequests = useRef<Map<string, { resolve: (val: any) => void, reject: (err: any) => void, output: string }>>(new Map());
+  const pendingRequests = useRef<Map<string, { resolve: (val: string) => void; reject: (err: Error) => void; output: string }>>(new Map());
   const workerRef = useRef<Worker | null>(null);
 
   const isBossMode = currentLesson?.isBoss || false;
@@ -119,6 +121,7 @@ const LessonPage = () => {
       workerRef.current?.terminate();
       URL.revokeObjectURL(workerUrl);
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- isPyodideReady is set by worker callback
   }, []);
 
   // --- ИНИЦИАЛИЗАЦИЯ УРОКА ---
@@ -265,7 +268,7 @@ const LessonPage = () => {
         let achievementMessage = "";
         const stats = calculateStats();
         const unlockedRaw = localStorage.getItem('unlockedAchievements');
-        let unlocked: string[] = unlockedRaw ? JSON.parse(unlockedRaw) : [];
+        const unlocked: string[] = unlockedRaw ? JSON.parse(unlockedRaw) : [];
 
         achievements.forEach(ach => {
           if (!unlocked.includes(ach.id) && ach.condition(stats)) {
@@ -291,11 +294,12 @@ const LessonPage = () => {
         // НЕВЕРНЫЙ ОТВЕТ
         handleError(`> ОШИБКА: Неверный результат.\n> ОЖИДАЛОСЬ: ${currentLesson.expectedOutput}\n> ПОЛУЧЕНО: ${resultOutput.trim()}`);
       }
-    } catch (err: any) {
-      handleError(`> СИСТЕМНЫЙ СБОЙ:\n${err.message}`);
+    } catch (err) {
+      handleError(`> СИСТЕМНЫЙ СБОЙ:\n${err instanceof Error ? err.message : String(err)}`);
     } finally {
       setIsLoading(false);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- handleError is stable and used intentionally
   }, [code, currentLesson, timeLeft, isPyodideReady, errorCount, cleanStreak, lessonId, isBossMode]);
 
   const handleError = (message: string) => {
