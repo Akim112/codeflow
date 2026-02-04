@@ -5,7 +5,7 @@ import { IconPlayerSkipForward, IconReload, IconBug, IconPlayerPlay } from '@tab
 interface DebugStep {
   line: number;
   code: string;
-  variables: Record<string, unknown>;
+  variables: Record<string, any>;
   lastChangedVar: string | null;
   output: string;
   action: string;
@@ -25,11 +25,11 @@ export const TimeDebugger = ({ code, onClose }: TimeDebuggerProps) => {
   const generateSteps = (sourceCode: string): DebugStep[] => {
     const lines = sourceCode.split('\n');
     const debugSteps: DebugStep[] = [];
-    let currentVars: Record<string, unknown> = {};
+    let currentVars: Record<string, any> = {};
     let currentOutput = '';
     let lineNumber = 0;
 
-    const processLine = (line: string): void => {
+    const processLine = (line: string, _indent: number = 0): void => {
       lineNumber++;
       const trimmedLine = line.trim();
       
@@ -52,7 +52,7 @@ export const TimeDebugger = ({ code, onClose }: TimeDebuggerProps) => {
             currentVars = { ...currentVars, [varName]: evaluatedValue };
             lastChangedVar = varName;
             action = `ASSIGN: ${varName} = ${JSON.stringify(evaluatedValue)}`;
-          } catch {
+          } catch (e) {
             currentVars = { ...currentVars, [varName]: '???' };
             action = `ASSIGN ERROR: ${varName}`;
           }
@@ -67,7 +67,7 @@ export const TimeDebugger = ({ code, onClose }: TimeDebuggerProps) => {
             const val = evaluateExpression(match[1], currentVars);
             currentOutput += String(val) + '\n';
             action = `PRINT: ${val}`;
-          } catch {
+          } catch (e) {
             currentOutput += 'ERROR\n';
             action = 'PRINT ERROR';
           }
@@ -126,7 +126,7 @@ export const TimeDebugger = ({ code, onClose }: TimeDebuggerProps) => {
                   try {
                     const val = evaluateExpression(printMatch[1], currentVars);
                     currentOutput += String(val) + '\n';
-                  } catch { /* ignore */ }
+                  } catch {}
                 }
               }
             });
@@ -168,11 +168,12 @@ export const TimeDebugger = ({ code, onClose }: TimeDebuggerProps) => {
   };
 
   // Вычисление выражений
-  const evaluateExpression = (expr: string, scope: Record<string, unknown>): unknown => {
+  const evaluateExpression = (expr: string, scope: Record<string, any>): any => {
     let processedExpr = expr.trim();
     
     // Обработка f-строк
     if (processedExpr.startsWith('f"') || processedExpr.startsWith("f'")) {
+      const quote = processedExpr[1];
       let content = processedExpr.slice(2, -1);
       content = content.replace(/\{(\w+)\}/g, (_, varName) => {
         return scope[varName] !== undefined ? String(scope[varName]) : varName;

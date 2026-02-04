@@ -2,15 +2,10 @@
 // Web Worker для Pyodide
 
 // Определяем типы для глобального скоупа воркера
-// @ts-expect-error self is WorkerGlobalScope in worker
-const ctx: Worker = self;
+// @ts-ignore
+const ctx: Worker = self as any;
 
-interface PyodideRuntime {
-  runPythonAsync: (code: string) => Promise<unknown>;
-  setStdout: (cfg: { batched?: (msg: string) => void }) => void;
-}
-
-let pyodide: PyodideRuntime | null = null;
+let pyodide: any = null;
 
 // Инициализация Pyodide
 async function loadPyodide() {
@@ -27,13 +22,13 @@ async function loadPyodide() {
         for (const cdn of cdns) {
             try {
                 ctx.postMessage({ type: 'LOG', message: `Trying to load from ${cdn}` });
-                // @ts-expect-error importScripts is global in worker
+                // @ts-ignore
                 importScripts(cdn);
                 loaded = true;
                 ctx.postMessage({ type: 'LOG', message: `Successfully loaded script from ${cdn}` });
                 break;
-            } catch (err) {
-                ctx.postMessage({ type: 'LOG', message: `Failed to load from ${cdn}: ${err}` });
+            } catch (e) {
+                ctx.postMessage({ type: 'LOG', message: `Failed to load from ${cdn}: ${e}` });
             }
         }
 
@@ -41,19 +36,19 @@ async function loadPyodide() {
             throw new Error('Failed to load Pyodide script from any CDN');
         }
 
-        // @ts-expect-error loadPyodide is injected by pyodide script
+        // @ts-ignore
         if (!self.loadPyodide) {
             throw new Error('self.loadPyodide is undefined after script load');
         }
 
         ctx.postMessage({ type: 'LOG', message: 'Starting loadPyodide()' });
-        // @ts-expect-error loadPyodide is injected by pyodide script
+        // @ts-ignore
         pyodide = await self.loadPyodide();
         ctx.postMessage({ type: 'LOG', message: 'Pyodide initialized' });
 
         ctx.postMessage({ type: 'READY' });
-    } catch (error: unknown) {
-        ctx.postMessage({ type: 'ERROR', error: error instanceof Error ? error.message : String(error) });
+    } catch (error: any) {
+        ctx.postMessage({ type: 'ERROR', error: error.message || String(error) });
     }
 }
 
@@ -85,8 +80,8 @@ ctx.onmessage = async (event) => {
                 result: result !== undefined ? String(result) : '',
                 id
             });
-        } catch (error: unknown) {
-            ctx.postMessage({ type: 'ERROR', error: error instanceof Error ? error.message : String(error), id });
+        } catch (error: any) {
+            ctx.postMessage({ type: 'ERROR', error: error.message, id });
         }
     }
 };
