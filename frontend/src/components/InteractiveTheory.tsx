@@ -13,7 +13,7 @@ export const InteractiveTheory = ({ text, onCodeClick }: Props) => {
   const playClickSound = useCallback(() => {
     try {
       if (!audioContextRef.current) {
-        audioContextRef.current = new (window.AudioContext || (window as Window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext)();
+        audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
       }
       
       const ctx = audioContextRef.current;
@@ -31,7 +31,7 @@ export const InteractiveTheory = ({ text, onCodeClick }: Props) => {
       osc.connect(gain).connect(ctx.destination);
       osc.start();
       osc.stop(ctx.currentTime + 0.1);
-    } catch {
+    } catch (e) {
       console.warn('Audio not supported');
     }
   }, []);

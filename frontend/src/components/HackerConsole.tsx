@@ -112,7 +112,7 @@ AI_ASSISTANT=GLITCH_v2.0`;
           }
           break;
 
-        case 'whoami': {
+        case 'whoami':
           const xp = localStorage.getItem('userXP') || '0';
           const rank = Number(xp) >= 2000 ? 'ROOT_ADMIN' : 
                        Number(xp) >= 1000 ? 'CYBER_GHOST' :
@@ -127,7 +127,6 @@ AI_ASSISTANT=GLITCH_v2.0`;
 ╚════════════════════════════════╝`;
           type = 'success';
           break;
-        }
 
         case 'status':
           response = `СИСТЕМА: Стабильна
@@ -145,14 +144,13 @@ BACKDOOR: Активен
           sounds.success();
           break;
 
-        case 'missions': {
+        case 'missions':
           const completed = JSON.parse(localStorage.getItem('completedLessons') || '[]');
           response = `Пройдено миссий: ${completed.length}\nID: [${completed.join(', ') || 'нет данных'}]`;
           type = 'success';
           break;
-        }
 
-        case 'rank': {
+        case 'rank':
           const currentXP = Number(localStorage.getItem('userXP') || '0');
           const ranks = [
             { name: 'SCRIPT_KIDDIE', min: 0 },
@@ -167,15 +165,13 @@ BACKDOOR: Активен
 ${nextRank ? `До ${nextRank.name}: ${nextRank.min - currentXP} XP` : 'Максимальный ранг достигнут!'}`;
           type = 'success';
           break;
-        }
 
-        case 'themes': {
+        case 'themes':
           const themes = JSON.parse(localStorage.getItem('ownedThemes') || '["classic"]');
           const active = localStorage.getItem('activeTheme') || 'classic';
           response = `Куплено тем: ${themes.length}\nАктивная: ${active}\nВсе: [${themes.join(', ')}]`;
           type = 'success';
           break;
-        }
 
         case 'ping':
           response = `Пингуем OmniCorp...
@@ -186,7 +182,7 @@ ${nextRank ? `До ${nextRank.name}: ${nextRank.min - currentXP} XP` : 'Макс
           type = 'success';
           break;
 
-        case 'hack': {
+        case 'hack':
           sounds.success();
           response = `[■■■■■■■■■■] 100%
 ВЗЛОМ УСПЕШЕН! ...шутка. Это всего лишь терминал.
@@ -195,7 +191,6 @@ ${nextRank ? `До ${nextRank.name}: ${nextRank.min - currentXP} XP` : 'Макс
           localStorage.setItem('userXP', String(hackXP));
           type = 'success';
           break;
-        }
 
         case 'matrix':
           response = `ИНИЦИАЛИЗАЦИЯ МАТРИЧНОГО ПРОТОКОЛА...

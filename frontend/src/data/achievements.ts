@@ -1,19 +1,9 @@
-export interface AchievementStats {
-  completedCount: number;
-  completedIds: number[];
-  totalXP: number;
-  themesOwned: number;
-  maxFactionRep: number;
-  cleanStreak: number;
-  fastBossKill: boolean;
-}
-
 export interface Achievement {
   id: string;
   title: string;
   description: string;
   icon: string;
-  condition: (stats: AchievementStats) => boolean;
+  condition: (stats: any) => boolean;
   rarity: 'common' | 'rare' | 'epic' | 'legendary';
 }
 

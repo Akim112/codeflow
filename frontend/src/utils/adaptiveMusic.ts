@@ -12,8 +12,8 @@ class AdaptiveMusic {
 
   constructor() {
     try {
-      this.audioContext = new (window.AudioContext || (window as Window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext)();
-    } catch {
+      this.audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+    } catch (e) {
       console.warn('Audio not supported');
     }
   }
@@ -32,7 +32,7 @@ class AdaptiveMusic {
       try {
         osc.stop();
         osc.disconnect();
-      } catch { /* ignore */ }
+      } catch {}
     });
     this.oscillators = [];
 
@@ -40,7 +40,7 @@ class AdaptiveMusic {
     this.gainNodes.forEach(gain => {
       try {
         gain.disconnect();
-      } catch { /* ignore */ }
+      } catch {}
     });
     this.gainNodes = [];
   }
