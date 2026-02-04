@@ -1,0 +1,1745 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="apple-touch-icon" href="/icon-192.png" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#00ff41" />
+    <meta name="description" content="CodeFlow - Взломай систему. Освой Python. Стань легендой." />
+    <meta name="keywords" content="python, обучение, хакер, программирование, coding" />
+    <meta name="author" content="CodeFlow Team" />
+    
+    <!-- Open Graph -->
+    <meta property="og:title" content="CodeFlow Terminal" />
+    <meta property="og:description" content="Взломай систему. Освой Python. Стань легендой." />
+    <meta property="og:type" content="website" />
+    <meta property="og:image" content="/og-image.png" />
+    
+    <!-- PWA Manifest -->
+    <link rel="manifest" href="/manifest.json" />
+    
+    <!-- Preconnect для оптимизации -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="preconnect" href="https://cdn.jsdelivr.net">
+    
+    <!-- Preload критических ресурсов -->
+    <link rel="preload" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Orbitron:wght@400;700;900&family=Share+Tech+Mono&display=swap" as="style">
+    
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Orbitron:wght@400;700;900&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+
+    <!-- Pyodide для выполнения Python в браузере с fallback -->
+    <script>
+      // Загрузка Pyodide с fallback на альтернативные CDN
+      const PYODIDE_CDNS = [
+        'https://cdn.jsdelivr.net/pyodide/v0.24.1/full/pyodide.js',
+        'https://unpkg.com/pyodide@0.24.1/pyodide.js',
+        'https://cdnjs.cloudflare.com/ajax/libs/pyodide/0.24.1/pyodide.min.js'
+      ];
+
+      let pyodideLoaded = false;
+      let currentCdnIndex = 0;
+
+      function loadPyodideScript(cdnUrl) {
+        return new Promise((resolve, reject) => {
+          const script = document.createElement('script');
+          script.src = cdnUrl;
+          script.async = true;
+          
+          const timeout = setTimeout(() => {
+            script.remove();
+            reject(new Error('Timeout loading Pyodide'));
+          }, 10000); // 10 секунд таймаут
+          
+          script.onload = () => {
+            clearTimeout(timeout);
+            pyodideLoaded = true;
+            console.log('✓ Pyodide loaded from:', cdnUrl);
+            resolve();
+          };
+          
+          script.onerror = () => {
+            clearTimeout(timeout);
+            script.remove();
+            reject(new Error('Failed to load from: ' + cdnUrl));
+          };
+          
+          document.head.appendChild(script);
+        });
+      }
+
+      async function loadPyodideWithFallback() {
+        for (let i = 0; i < PYODIDE_CDNS.length; i++) {
+          try {
+            console.log('Trying to load Pyodide from:', PYODIDE_CDNS[i]);
+            await loadPyodideScript(PYODIDE_CDNS[i]);
+            return true;
+          } catch (e) {
+            console.warn('CDN failed:', PYODIDE_CDNS[i], e.message);
+          }
+        }
+        console.error('❌ All Pyodide CDNs failed. Python execution will be unavailable.');
+        window.pyodideLoadError = true;
+        return false;
+      }
+
+      // Запускаем загрузку
+      loadPyodideWithFallback();
+    </script>
+    
+    <title>CodeFlow Terminal | BREACH IN PROGRESS...</title>
+
+    <!-- Динамический Favicon -->
+    <script>
+      // Анимированный favicon
+      const faviconFrames = ['⬡', '⬢', '◇', '◈'];
+      let faviconIndex = 0;
+      
+      function updateFavicon() {
+        const canvas = document.createElement('canvas');
+        canvas.width = 32;
+        canvas.height = 32;
+        const ctx = canvas.getContext('2d');
+        
+        ctx.fillStyle = '#000';
+        ctx.fillRect(0, 0, 32, 32);
+        ctx.fillStyle = '#00ff41';
+        ctx.font = '24px Arial';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(faviconFrames[faviconIndex], 16, 16);
+        
+        const link = document.querySelector("link[rel*='icon']") || document.createElement('link');
+        link.type = 'image/x-icon';
+        link.rel = 'shortcut icon';
+        link.href = canvas.toDataURL();
+        document.getElementsByTagName('head')[0].appendChild(link);
+        
+        faviconIndex = (faviconIndex + 1) % faviconFrames.length;
+      }
+      
+      setInterval(updateFavicon, 500);
+    </script>
+
+    <style>
+      /* ════════════════════════════════════════════════════════════════
+         CODEFLOW TERMINAL - ULTIMATE CYBERPUNK EXPERIENCE v4.0
+         ════════════════════════════════════════════════════════════════ */
+
+      /* ═══════════════════════════════════════
+         CSS ПЕРЕМЕННЫЕ
+      ═══════════════════════════════════════ */
+      :root {
+        /* Основные цвета */
+        --neon-green: #00FF41;
+        --neon-cyan: #00FFF9;
+        --neon-pink: #FF00C1;
+        --neon-red: #FF4136;
+        --neon-yellow: #FFD700;
+        --neon-purple: #BF40BF;
+        --neon-orange: #FF6600;
+        
+        /* Фоны */
+        --dark-bg: #050505;
+        --darker-bg: #020202;
+        --card-bg: #0a0a0a;
+        --terminal-green: #33ff33;
+        
+        /* Анимации */
+        --glitch-delay: 5s;
+        --transition-speed: 0.3s;
+        
+        /* Размеры */
+        --hud-padding: 20px;
+        --corner-size: 30px;
+      }
+
+      /* ═══════════════════════════════════════
+         СБРОС И БАЗОВЫЕ СТИЛИ
+      ═══════════════════════════════════════ */
+      *, *::before, *::after {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+
+      html {
+        scroll-behavior: smooth;
+        -webkit-font-smoothing: antialiased;
+        -moz-osx-font-smoothing: grayscale;
+      }
+
+      html, body, #root {
+        height: 100%;
+        background-color: var(--dark-bg);
+        color: #C1C2C5;
+        font-family: 'JetBrains Mono', 'Share Tech Mono', monospace;
+        overflow-x: hidden;
+      }
+
+      ::selection {
+        background: var(--neon-green);
+        color: #000;
+      }
+
+      /* ═══════════════════════════════════════
+         ЗАГРУЗОЧНЫЙ ЭКРАН (BOOT SEQUENCE) v2.0
+      ═══════════════════════════════════════ */
+      #boot-screen {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: #000;
+        color: var(--neon-green);
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        z-index: 99999;
+        font-family: 'Share Tech Mono', monospace;
+        overflow: hidden;
+      }
+
+      #boot-screen.fade-out {
+        animation: bootFadeOut 1s forwards;
+      }
+
+      #boot-screen.hidden {
+        display: none !important;
+      }
+
+      @keyframes bootFadeOut {
+        0% { opacity: 1; filter: blur(0); }
+        50% { opacity: 0.5; filter: blur(2px); }
+        100% { opacity: 0; filter: blur(10px); pointer-events: none; }
+      }
+
+      /* Голографическая сетка на boot screen */
+      #boot-screen::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: 
+          linear-gradient(90deg, rgba(0,255,65,0.03) 1px, transparent 1px),
+          linear-gradient(rgba(0,255,65,0.03) 1px, transparent 1px);
+        background-size: 50px 50px;
+        animation: gridMove 20s linear infinite;
+      }
+
+      @keyframes gridMove {
+        0% { transform: perspective(500px) rotateX(60deg) translateY(0); }
+        100% { transform: perspective(500px) rotateX(60deg) translateY(50px); }
+      }
+
+      .boot-container {
+        position: relative;
+        z-index: 2;
+        text-align: center;
+      }
+
+      .boot-logo {
+        font-size: clamp(32px, 8vw, 64px);
+        font-weight: 900;
+        font-family: 'Orbitron', sans-serif;
+        margin-bottom: 40px;
+        position: relative;
+        text-shadow: 
+          0 0 10px var(--neon-green), 
+          0 0 20px var(--neon-green),
+          0 0 40px var(--neon-green);
+        animation: logoGlitch 0.5s infinite, logoPulse 2s ease-in-out infinite;
+      }
+
+      .boot-logo::before {
+        content: '⬡ CODEFLOW ⬡';
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        color: var(--neon-cyan);
+        clip-path: polygon(0 0, 100% 0, 100% 50%, 0 50%);
+        animation: logoGlitchTop 3s infinite;
+      }
+
+      @keyframes logoGlitch {
+        0%, 90%, 100% { transform: translate(0); }
+        92% { transform: translate(-3px, 3px) skew(0.5deg); }
+        94% { transform: translate(3px, -3px) skew(-0.5deg); }
+        96% { transform: translate(-3px, -3px); }
+      }
+
+      @keyframes logoPulse {
+        0%, 100% { filter: brightness(1); }
+        50% { filter: brightness(1.3); }
+      }
+
+      @keyframes logoGlitchTop {
+        0%, 95%, 100% { transform: translateX(0); }
+        96% { transform: translateX(-5px); }
+        97% { transform: translateX(5px); }
+        98% { transform: translateX(-2px); }
+      }
+
+      .boot-text {
+        font-size: clamp(10px, 2vw, 14px);
+        margin: 8px 0;
+        opacity: 0;
+        transform: translateX(-30px);
+        position: relative;
+        text-align: left;
+        max-width: 500px;
+      }
+
+      .boot-text::before {
+        content: '';
+        position: absolute;
+        left: 0;
+        top: 50%;
+        width: 0;
+        height: 1px;
+        background: var(--neon-green);
+        box-shadow: 0 0 10px var(--neon-green);
+        animation: bootLineGlow 0.5s forwards;
+        animation-delay: inherit;
+      }
+
+      .boot-text.visible {
+        animation: bootLineAppear 0.5s forwards;
+      }
+
+      @keyframes bootLineAppear {
+        0% { opacity: 0; transform: translateX(-30px); }
+        100% { opacity: 1; transform: translateX(0); }
+      }
+
+      .boot-text .status {
+        color: var(--neon-cyan);
+        float: right;
+      }
+
+      .boot-text .status.success { color: var(--neon-green); }
+      .boot-text .status.warning { color: var(--neon-yellow); }
+      .boot-text .status.error { color: var(--neon-red); }
+
+      /* Прогресс-бар загрузки */
+      .boot-progress {
+        width: 300px;
+        max-width: 80vw;
+        height: 6px;
+        background: rgba(0, 255, 65, 0.1);
+        border: 1px solid var(--neon-green);
+        border-radius: 3px;
+        overflow: hidden;
+        margin-top: 30px;
+        position: relative;
+      }
+
+      .boot-progress::after {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        height: 100%;
+        width: var(--progress, 0%);
+        background: linear-gradient(90deg, var(--neon-green), var(--neon-cyan), var(--neon-green));
+        background-size: 200% 100%;
+        animation: progressGlow 1s linear infinite;
+        box-shadow: 0 0 20px var(--neon-green);
+        transition: width 0.3s ease;
+      }
+
+      @keyframes progressGlow {
+        0% { background-position: 0% 0%; }
+        100% { background-position: 200% 0%; }
+      }
+
+      .boot-percentage {
+        font-size: 12px;
+        margin-top: 10px;
+        color: var(--neon-cyan);
+        font-family: 'Orbitron', sans-serif;
+      }
+
+      /* ASCII Art для boot screen */
+      .boot-ascii {
+        font-size: 8px;
+        line-height: 1;
+        color: rgba(0, 255, 65, 0.3);
+        position: absolute;
+        top: 20px;
+        left: 20px;
+        white-space: pre;
+        animation: asciiPulse 3s ease-in-out infinite;
+      }
+
+      @keyframes asciiPulse {
+        0%, 100% { opacity: 0.3; }
+        50% { opacity: 0.5; }
+      }
+
+      /* ═══════════════════════════════════════
+         HUD ЭЛЕМЕНТЫ (HEADS UP DISPLAY)
+      ═══════════════════════════════════════ */
+      .hud-corner {
+        position: fixed;
+        width: var(--corner-size);
+        height: var(--corner-size);
+        border: 2px solid var(--neon-green);
+        z-index: 9990;
+        pointer-events: none;
+        opacity: 0.6;
+      }
+
+      .hud-corner--tl {
+        top: var(--hud-padding);
+        left: var(--hud-padding);
+        border-right: none;
+        border-bottom: none;
+      }
+
+      .hud-corner--tr {
+        top: var(--hud-padding);
+        right: var(--hud-padding);
+        border-left: none;
+        border-bottom: none;
+      }
+
+      .hud-corner--bl {
+        bottom: var(--hud-padding);
+        left: var(--hud-padding);
+        border-right: none;
+        border-top: none;
+      }
+
+      .hud-corner--br {
+        bottom: var(--hud-padding);
+        right: var(--hud-padding);
+        border-left: none;
+        border-top: none;
+      }
+
+      /* Анимированные точки в углах */
+      .hud-corner::after {
+        content: '';
+        position: absolute;
+        width: 6px;
+        height: 6px;
+        background: var(--neon-green);
+        border-radius: 50%;
+        box-shadow: 0 0 10px var(--neon-green);
+        animation: hudDotPulse 2s ease-in-out infinite;
+      }
+
+      .hud-corner--tl::after { top: -3px; left: -3px; }
+      .hud-corner--tr::after { top: -3px; right: -3px; }
+      .hud-corner--bl::after { bottom: -3px; left: -3px; }
+      .hud-corner--br::after { bottom: -3px; right: -3px; }
+
+      @keyframes hudDotPulse {
+        0%, 100% { transform: scale(1); opacity: 0.6; }
+        50% { transform: scale(1.5); opacity: 1; }
+      }
+
+      /* Статус-бар снизу */
+      .hud-status-bar {
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        width: 100%;
+        height: 24px;
+        background: linear-gradient(90deg, rgba(0,0,0,0.9), rgba(0,20,0,0.9), rgba(0,0,0,0.9));
+        border-top: 1px solid rgba(0, 255, 65, 0.3);
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 0 20px;
+        font-size: 10px;
+        color: var(--neon-green);
+        z-index: 9990;
+        font-family: 'Share Tech Mono', monospace;
+      }
+
+      .hud-status-item {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        opacity: 0.7;
+      }
+
+      .hud-status-item::before {
+        content: '◆';
+        font-size: 6px;
+        animation: statusBlink 1s infinite;
+      }
+
+      .hud-status-item.active::before {
+        color: var(--neon-green);
+      }
+
+      .hud-status-item.warning::before {
+        color: var(--neon-yellow);
+      }
+
+      @keyframes statusBlink {
+        0%, 50%, 100% { opacity: 1; }
+        25%, 75% { opacity: 0.3; }
+      }
+
+      /* Верхний HUD */
+      .hud-top-bar {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 3px;
+        background: linear-gradient(90deg, 
+          transparent 0%,
+          var(--neon-green) 20%,
+          var(--neon-cyan) 50%,
+          var(--neon-green) 80%,
+          transparent 100%
+        );
+        z-index: 9990;
+        opacity: 0.5;
+        animation: topBarScan 3s linear infinite;
+      }
+
+      @keyframes topBarScan {
+        0% { opacity: 0.3; filter: hue-rotate(0deg); }
+        50% { opacity: 0.7; filter: hue-rotate(30deg); }
+        100% { opacity: 0.3; filter: hue-rotate(0deg); }
+      }
+
+      /* ═══════════════════════════════════════
+         КУРСОР С ЭФФЕКТАМИ
+      ═══════════════════════════════════════ */
+      .cursor-dot {
+        position: fixed;
+        width: 8px;
+        height: 8px;
+        background: var(--neon-green);
+        border-radius: 50%;
+        pointer-events: none;
+        z-index: 99999;
+        box-shadow: 
+          0 0 10px var(--neon-green),
+          0 0 20px var(--neon-green),
+          0 0 30px var(--neon-green);
+        transition: transform 0.1s ease;
+        mix-blend-mode: screen;
+      }
+
+      .cursor-ring {
+        position: fixed;
+        width: 40px;
+        height: 40px;
+        border: 2px solid var(--neon-green);
+        border-radius: 50%;
+        pointer-events: none;
+        z-index: 99998;
+        transition: all 0.15s ease;
+        opacity: 0.5;
+      }
+
+      .cursor-ring.clicking {
+        transform: scale(0.8);
+        opacity: 1;
+      }
+
+      .cursor-ring.hovering {
+        transform: scale(1.5);
+        border-color: var(--neon-cyan);
+        background: rgba(0, 255, 249, 0.1);
+      }
+
+      /* Cursor spotlight */
+      .cursor-spotlight {
+        position: fixed;
+        width: 300px;
+        height: 300px;
+        background: radial-gradient(circle, rgba(0,255,65,0.1) 0%, transparent 70%);
+        pointer-events: none;
+        z-index: 1;
+        transform: translate(-50%, -50%);
+        transition: opacity 0.3s;
+      }
+
+      /* Cursor trail */
+      .cursor-trail {
+        position: fixed;
+        width: 6px;
+        height: 6px;
+        background: var(--neon-green);
+        border-radius: 50%;
+        pointer-events: none;
+        z-index: 99997;
+        opacity: 0;
+        transition: opacity 0.5s;
+      }
+
+      /* ═══════════════════════════════════════
+         SCANLINES (ЭФФЕКТ СТАРОГО МОНИТОРА)
+      ═══════════════════════════════════════ */
+      .scanlines {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: 
+          repeating-linear-gradient(
+            0deg,
+            rgba(0, 0, 0, 0.15),
+            rgba(0, 0, 0, 0.15) 1px,
+            transparent 1px,
+            transparent 2px
+          );
+        pointer-events: none;
+        z-index: 9998;
+        opacity: 0.3;
+        animation: scanlineMove 10s linear infinite;
+      }
+
+      @keyframes scanlineMove {
+        0% { transform: translateY(0); }
+        100% { transform: translateY(4px); }
+      }
+
+      /* RGB-разделение (хроматическая аберрация) */
+      .rgb-split {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        pointer-events: none;
+        z-index: 9997;
+        opacity: 0;
+        animation: rgbSplitFlicker 10s infinite;
+      }
+
+      @keyframes rgbSplitFlicker {
+        0%, 95%, 100% { opacity: 0; }
+        96% { opacity: 0.03; }
+        97% { opacity: 0; }
+        98% { opacity: 0.05; }
+      }
+
+      /* ═══════════════════════════════════════
+         МЕРЦАНИЕ ЭКРАНА (FLICKER)
+      ═══════════════════════════════════════ */
+      .flicker-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.03);
+        pointer-events: none;
+        z-index: 9996;
+        animation: flicker 0.15s infinite;
+      }
+
+      @keyframes flicker {
+        0% { opacity: 0.03; }
+        5% { opacity: 0.01; }
+        10% { opacity: 0.02; }
+        15% { opacity: 0.04; }
+        20% { opacity: 0.01; }
+        25% { opacity: 0.03; }
+        30% { opacity: 0.02; }
+        35% { opacity: 0.04; }
+        40% { opacity: 0.01; }
+        45% { opacity: 0.02; }
+        50% { opacity: 0.03; }
+        55% { opacity: 0.01; }
+        60% { opacity: 0.04; }
+        65% { opacity: 0.02; }
+        70% { opacity: 0.03; }
+        75% { opacity: 0.01; }
+        80% { opacity: 0.02; }
+        85% { opacity: 0.04; }
+        90% { opacity: 0.01; }
+        95% { opacity: 0.03; }
+        100% { opacity: 0.02; }
+      }
+
+      /* ═══════════════════════════════════════
+         ВИНЬЕТКА
+      ═══════════════════════════════════════ */
+      .vignette {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        box-shadow: inset 0 0 150px rgba(0, 0, 0, 0.9);
+        pointer-events: none;
+        z-index: 9995;
+      }
+
+      /* ═══════════════════════════════════════
+         БОСС-РЕЖИМ ОВЕРЛЕЙ
+      ═══════════════════════════════════════ */
+      .boss-mode-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        pointer-events: none;
+        z-index: 9994;
+        opacity: 0;
+        transition: opacity 0.5s;
+        background: 
+          radial-gradient(ellipse at center, transparent 0%, rgba(255,0,0,0.2) 100%);
+      }
+
+      .boss-mode-overlay.active {
+        opacity: 1;
+        animation: bossModePulse 1s ease-in-out infinite;
+      }
+
+      @keyframes bossModePulse {
+        0%, 100% { 
+          background: radial-gradient(ellipse at center, transparent 0%, rgba(255,0,0,0.15) 100%);
+        }
+        50% { 
+          background: radial-gradient(ellipse at center, transparent 0%, rgba(255,0,0,0.3) 100%);
+        }
+      }
+
+      /* Предупреждающие полосы для босс-режима */
+      .boss-warning-stripes {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 4px;
+        background: repeating-linear-gradient(
+          90deg,
+          var(--neon-red) 0px,
+          var(--neon-red) 20px,
+          var(--neon-yellow) 20px,
+          var(--neon-yellow) 40px
+        );
+        z-index: 9993;
+        opacity: 0;
+        transition: opacity 0.3s;
+        animation: warningScroll 1s linear infinite;
+      }
+
+      .boss-warning-stripes.active {
+        opacity: 1;
+      }
+
+      .boss-warning-stripes.bottom {
+        top: auto;
+        bottom: 24px;
+      }
+
+      @keyframes warningScroll {
+        0% { background-position: 0 0; }
+        100% { background-position: 40px 0; }
+      }
+
+      /* ═══════════════════════════════════════
+         СТАТИЧЕСКИЕ ПОМЕХИ (NOISE)
+      ═══════════════════════════════════════ */
+      .noise-overlay {
+        position: fixed;
+        top: -50%;
+        left: -50%;
+        width: 200%;
+        height: 200%;
+        pointer-events: none;
+        z-index: 9992;
+        opacity: 0.02;
+        background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
+        animation: noiseMove 0.2s steps(10) infinite;
+      }
+
+      @keyframes noiseMove {
+        0%, 100% { transform: translate(0, 0); }
+        10% { transform: translate(-5%, -5%); }
+        20% { transform: translate(-10%, 5%); }
+        30% { transform: translate(5%, -10%); }
+        40% { transform: translate(-5%, 15%); }
+        50% { transform: translate(-10%, 5%); }
+        60% { transform: translate(15%, 0%); }
+        70% { transform: translate(0%, 10%); }
+        80% { transform: translate(-15%, 0%); }
+        90% { transform: translate(10%, 5%); }
+      }
+
+      /* ═══════════════════════════════════════
+         ГЛИТЧ-ЭФФЕКТ ДЛЯ ТЕКСТА
+      ═══════════════════════════════════════ */
+      .glitch {
+        position: relative;
+        display: inline-block;
+        color: var(--neon-green);
+        animation: glitchSkew 3s infinite linear alternate-reverse;
+      }
+
+      .glitch::before, 
+      .glitch::after {
+        content: attr(data-text);
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: transparent;
+      }
+
+      .glitch::before {
+        left: 2px;
+        text-shadow: -3px 0 var(--neon-pink);
+        clip: rect(44px, 450px, 56px, 0);
+        animation: glitchAnim var(--glitch-delay) infinite linear alternate-reverse;
+      }
+
+      .glitch::after {
+        left: -2px;
+        text-shadow: -3px 0 var(--neon-cyan);
+        clip: rect(44px, 450px, 56px, 0);
+        animation: glitchAnim2 var(--glitch-delay) infinite linear alternate-reverse;
+      }
+
+      @keyframes glitchSkew {
+        0%, 90%, 100% { transform: skew(0deg); }
+        93% { transform: skew(0.5deg); }
+        95% { transform: skew(-0.5deg); }
+        97% { transform: skew(0.3deg); }
+      }
+
+      @keyframes glitchAnim {
+        0% { clip: rect(31px, 9999px, 94px, 0); transform: skew(0.3deg); }
+        10% { clip: rect(112px, 9999px, 63px, 0); transform: skew(0.1deg); }
+        20% { clip: rect(85px, 9999px, 27px, 0); transform: skew(0.8deg); }
+        30% { clip: rect(18px, 9999px, 140px, 0); transform: skew(0.5deg); }
+        40% { clip: rect(99px, 9999px, 45px, 0); transform: skew(0.2deg); }
+        50% { clip: rect(52px, 9999px, 107px, 0); transform: skew(0.9deg); }
+        60% { clip: rect(71px, 9999px, 33px, 0); transform: skew(0.4deg); }
+        70% { clip: rect(5px, 9999px, 123px, 0); transform: skew(0.7deg); }
+        80% { clip: rect(88px, 9999px, 11px, 0); transform: skew(0.6deg); }
+        90% { clip: rect(41px, 9999px, 76px, 0); transform: skew(0.3deg); }
+        100% { clip: rect(64px, 9999px, 55px, 0); transform: skew(0deg); }
+      }
+
+      @keyframes glitchAnim2 {
+        0% { clip: rect(77px, 9999px, 22px, 0); }
+        20% { clip: rect(133px, 9999px, 8px, 0); }
+        40% { clip: rect(44px, 9999px, 99px, 0); }
+        60% { clip: rect(11px, 9999px, 144px, 0); }
+        80% { clip: rect(66px, 9999px, 37px, 0); }
+        100% { clip: rect(92px, 9999px, 61px, 0); }
+      }
+
+      /* ═══════════════════════════════════════
+         НЕОНОВОЕ СВЕЧЕНИЕ
+      ═══════════════════════════════════════ */
+      .neon-glow {
+        text-shadow: 
+          0 0 5px var(--neon-green),
+          0 0 10px var(--neon-green),
+          0 0 20px var(--neon-green),
+          0 0 40px var(--neon-green),
+          0 0 80px var(--neon-green);
+        animation: neonFlicker 1.5s infinite alternate;
+      }
+
+      @keyframes neonFlicker {
+        0%, 18%, 22%, 25%, 53%, 57%, 100% {
+          text-shadow:
+            0 0 5px var(--neon-green),
+            0 0 10px var(--neon-green),
+            0 0 20px var(--neon-green),
+            0 0 40px var(--neon-green);
+        }
+        20%, 24%, 55% {
+          text-shadow: none;
+        }
+      }
+
+      /* ═══════════════════════════════════════
+         ТРЯСКА ЭКРАНА
+      ═══════════════════════════════════════ */
+      @keyframes shakeIntense {
+        0% { transform: translate(0, 0) rotate(0deg); }
+        10% { transform: translate(-5px, -3px) rotate(-1deg); }
+        20% { transform: translate(-3px, 0px) rotate(1deg); }
+        30% { transform: translate(5px, 3px) rotate(0deg); }
+        40% { transform: translate(1px, -2px) rotate(1deg); }
+        50% { transform: translate(-2px, 4px) rotate(-1deg); }
+        60% { transform: translate(-4px, 1px) rotate(0deg); }
+        70% { transform: translate(3px, 2px) rotate(-1deg); }
+        80% { transform: translate(-1px, -2px) rotate(1deg); }
+        90% { transform: translate(2px, 1px) rotate(0deg); }
+        100% { transform: translate(0, 0) rotate(0deg); }
+      }
+
+      .shake-screen {
+        animation: shakeIntense 0.5s cubic-bezier(.36,.07,.19,.97) both;
+      }
+
+      .shake-screen::after {
+        content: '';
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(255, 0, 0, 0.1);
+        pointer-events: none;
+        animation: flashRed 0.5s;
+      }
+
+      @keyframes flashRed {
+        0%, 100% { opacity: 0; }
+        50% { opacity: 1; }
+      }
+
+      /* ═══════════════════════════════════════
+         МАТРИЧНЫЙ ДОЖДЬ
+      ═══════════════════════════════════════ */
+      #matrix-rain {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        pointer-events: none;
+        z-index: 1;
+        opacity: 0.04;
+      }
+
+      /* ═══════════════════════════════════════
+         PARTICLES CANVAS
+      ═══════════════════════════════════════ */
+      #particles {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        pointer-events: none;
+        z-index: 2;
+        opacity: 0.5;
+      }
+
+      /* ═══════════════════════════════════════
+         DATA STREAMS (потоки данных по бокам)
+      ═══════════════════════════════════════ */
+      .data-stream {
+        position: fixed;
+        width: 150px;
+        height: 100%;
+        top: 0;
+        font-size: 10px;
+        font-family: 'Share Tech Mono', monospace;
+        color: var(--neon-green);
+        opacity: 0.1;
+        z-index: 1;
+        overflow: hidden;
+        pointer-events: none;
+      }
+
+      .data-stream--left {
+        left: 0;
+        text-align: left;
+        padding-left: 10px;
+      }
+
+      .data-stream--right {
+        right: 0;
+        text-align: right;
+        padding-right: 10px;
+      }
+
+      .data-stream-content {
+        animation: dataScroll 20s linear infinite;
+      }
+
+      @keyframes dataScroll {
+        0% { transform: translateY(0); }
+        100% { transform: translateY(-50%); }
+      }
+
+      /* ═══════════════════════════════════════
+         HOLOGRAPHIC SCAN LINE
+      ═══════════════════════════════════════ */
+      .holo-scan {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 5px;
+        background: linear-gradient(90deg, 
+          transparent, 
+          var(--neon-cyan), 
+          var(--neon-green),
+          var(--neon-cyan),
+          transparent
+        );
+        opacity: 0.2;
+        z-index: 9991;
+        pointer-events: none;
+        animation: holoScan 4s linear infinite;
+      }
+
+      @keyframes holoScan {
+        0% { top: -5px; opacity: 0; }
+        10% { opacity: 0.3; }
+        90% { opacity: 0.3; }
+        100% { top: 100%; opacity: 0; }
+      }
+
+      /* ═══════════════════════════════════════
+         СКРОЛЛБАР
+      ═══════════════════════════════════════ */
+      ::-webkit-scrollbar {
+        width: 8px;
+        height: 8px;
+      }
+
+      ::-webkit-scrollbar-track {
+        background: #0a0a0a;
+        border-left: 1px solid #1a1a1a;
+      }
+
+      ::-webkit-scrollbar-thumb {
+        background: linear-gradient(180deg, var(--neon-green) 0%, #0f5132 100%);
+        border-radius: 0;
+        box-shadow: 0 0 10px rgba(0, 255, 65, 0.5);
+      }
+
+      ::-webkit-scrollbar-thumb:hover {
+        background: linear-gradient(180deg, #00ff41 0%, #2f9e44 100%);
+        box-shadow: 0 0 20px rgba(0, 255, 65, 0.8);
+      }
+
+      ::-webkit-scrollbar-corner {
+        background: #0a0a0a;
+      }
+
+      /* ═══════════════════════════════════════
+         КНОПКИ
+      ═══════════════════════════════════════ */
+      button {
+        cursor: pointer;
+        transition: all var(--transition-speed) ease;
+        position: relative;
+        overflow: hidden;
+      }
+
+      button::before {
+        content: '';
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        width: 0;
+        height: 0;
+        border-radius: 50%;
+        background: rgba(0, 255, 65, 0.2);
+        transform: translate(-50%, -50%);
+        transition: width 0.4s ease, height 0.4s ease;
+      }
+
+      button:hover::before {
+        width: 300px;
+        height: 300px;
+      }
+
+      button:hover {
+        box-shadow: 
+          0 0 20px rgba(0, 255, 65, 0.5),
+          inset 0 0 20px rgba(0, 255, 65, 0.1);
+        transform: translateY(-2px);
+      }
+
+      button:active {
+        transform: translateY(0) scale(0.98);
+      }
+
+      /* ═══════════════════════════════════════
+         EASTER EGG NOTIFICATION
+      ═══════════════════════════════════════ */
+      .easter-egg-notification {
+        position: fixed;
+        bottom: 50px;
+        left: 50%;
+        transform: translateX(-50%) translateY(100px);
+        background: linear-gradient(135deg, #0a0a0a, #1a1a1a);
+        border: 1px solid var(--neon-green);
+        padding: 15px 30px;
+        color: var(--neon-green);
+        font-family: 'Share Tech Mono', monospace;
+        z-index: 99999;
+        opacity: 0;
+        transition: all 0.5s ease;
+        box-shadow: 0 0 30px rgba(0, 255, 65, 0.3);
+      }
+
+      .easter-egg-notification.show {
+        opacity: 1;
+        transform: translateX(-50%) translateY(0);
+      }
+
+      .easter-egg-notification::before {
+        content: '🔓';
+        margin-right: 10px;
+      }
+
+      /* ═══════════════════════════════════════
+         RESPONSIVE
+      ═══════════════════════════════════════ */
+      @media (max-width: 768px) {
+        .scanlines,
+        .flicker-overlay,
+        .noise-overlay,
+        .data-stream,
+        .hud-corner,
+        .hud-top-bar,
+        .cursor-dot,
+        .cursor-ring,
+        .cursor-spotlight {
+          display: none !important;
+        }
+
+        .hud-status-bar {
+          font-size: 8px;
+          height: 20px;
+          padding: 0 10px;
+        }
+
+        .boot-logo {
+          font-size: 28px;
+        }
+
+        .boot-text {
+          font-size: 10px;
+        }
+
+        :root {
+          --hud-padding: 10px;
+        }
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        *,
+        *::before,
+        *::after {
+          animation-duration: 0.01ms !important;
+          animation-iteration-count: 1 !important;
+          transition-duration: 0.01ms !important;
+        }
+      }
+
+      /* ═══════════════════════════════════════
+         BOSS MODE ПЕРЕМЕННЫЕ
+      ═══════════════════════════════════════ */
+      [data-boss-mode="true"] {
+        --neon-green: #FF4136;
+        --neon-cyan: #FF6B6B;
+        --terminal-green: #ff3333;
+      }
+
+      [data-boss-mode="true"] .hud-corner,
+      [data-boss-mode="true"] .hud-status-bar,
+      [data-boss-mode="true"] .hud-top-bar {
+        border-color: var(--neon-red);
+      }
+
+      [data-boss-mode="true"] .hud-corner::after {
+        background: var(--neon-red);
+        box-shadow: 0 0 10px var(--neon-red);
+      }
+
+      /* ═══════════════════════════════════════
+         PRINT STYLES
+      ═══════════════════════════════════════ */
+      @media print {
+        .scanlines,
+        .flicker-overlay,
+        .noise-overlay,
+        .vignette,
+        .hud-corner,
+        .hud-status-bar,
+        .hud-top-bar,
+        #matrix-rain,
+        #particles,
+        .cursor-dot,
+        .cursor-ring,
+        .data-stream,
+        .holo-scan {
+          display: none !important;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <!-- ═══════════════════════════════════════
+         ЗАГРУЗОЧНЫЙ ЭКРАН
+    ═══════════════════════════════════════ -->
+    <div id="boot-screen">
+      <!-- ASCII декорация -->
+      <pre class="boot-ascii">
+   _____ ____  ____  _____ _____ _     _____       __
+  / ____/ __ \|  _ \| ____|  ___| |   / _ \ \     / /
+ | |   | |  | | | | |  _| | |_  | |  | | | \ \ /\ / / 
+ | |   | |  | | | | | |___|  _| | |  | | | |\ V  V /  
+ | |___| |__| | |_| | ____|_|   | |__| |_| | \_/\_/   
+  \_____\____/|____/|_____|_|   |_____\___/           
+      </pre>
+
+      <div class="boot-container">
+        <div class="boot-logo">⬡ CODEFLOW ⬡</div>
+        
+        <div class="boot-text" id="boot-1">> INITIALIZING KERNEL... <span class="status success">[OK]</span></div>
+        <div class="boot-text" id="boot-2">> LOADING SYSTEM MODULES... <span class="status success">[OK]</span></div>
+        <div class="boot-text" id="boot-3">> ESTABLISHING SECURE CONNECTION... <span class="status success">[OK]</span></div>
+        <div class="boot-text" id="boot-4">> BYPASSING OMNICORP FIREWALL... <span class="status warning">[DETECTED]</span></div>
+        <div class="boot-text" id="boot-5">> APPLYING COUNTERMEASURES... <span class="status success">[OK]</span></div>
+        <div class="boot-text" id="boot-6">> LOADING PYTHON RUNTIME (PYODIDE)... <span class="status success">[OK]</span></div>
+        <div class="boot-text" id="boot-7">> INJECTING AI ASSISTANT 'GLITCH'... <span class="status success">[OK]</span></div>
+        <div class="boot-text" id="boot-8">> INITIATING OPERATION 'SILENT STORM'... <span class="status success">[OK]</span></div>
+        <div class="boot-text" id="boot-9" style="color: var(--neon-green); margin-top: 15px;">> ✓ SYSTEM READY. WELCOME, OPERATIVE.</div>
+        
+        <div class="boot-progress" style="--progress: 0%;"></div>
+        <div class="boot-percentage">0%</div>
+      </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════
+         ЭФФЕКТЫ ОВЕРЛЕИ
+    ═══════════════════════════════════════ -->
+    <div class="scanlines"></div>
+    <div class="flicker-overlay"></div>
+    <div class="vignette"></div>
+    <div class="noise-overlay"></div>
+    <div class="rgb-split"></div>
+    <div class="holo-scan"></div>
+
+    <!-- BOSS MODE -->
+    <div class="boss-mode-overlay" id="boss-overlay"></div>
+    <div class="boss-warning-stripes" id="boss-stripes-top"></div>
+    <div class="boss-warning-stripes bottom" id="boss-stripes-bottom"></div>
+
+    <!-- ═══════════════════════════════════════
+         HUD ЭЛЕМЕНТЫ
+    ═══════════════════════════════════════ -->
+    <div class="hud-corner hud-corner--tl"></div>
+    <div class="hud-corner hud-corner--tr"></div>
+    <div class="hud-corner hud-corner--bl"></div>
+    <div class="hud-corner hud-corner--br"></div>
+
+    <div class="hud-top-bar"></div>
+
+    <div class="hud-status-bar">
+      <div class="hud-status-item active">SYS: ONLINE</div>
+      <div class="hud-status-item active">NET: ENCRYPTED</div>
+      <div class="hud-status-item" id="hud-fps">FPS: --</div>
+      <div class="hud-status-item active">SEC: LEVEL 5</div>
+      <div class="hud-status-item" id="hud-time">00:00:00</div>
+    </div>
+
+    <!-- ═══════════════════════════════════════
+         DATA STREAMS (боковые потоки данных)
+    ═══════════════════════════════════════ -->
+    <div class="data-stream data-stream--left">
+      <div class="data-stream-content" id="data-stream-left"></div>
+    </div>
+    <div class="data-stream data-stream--right">
+      <div class="data-stream-content" id="data-stream-right"></div>
+    </div>
+
+    <!-- ═══════════════════════════════════════
+         CANVAS ЭЛЕМЕНТЫ
+    ═══════════════════════════════════════ -->
+    <canvas id="matrix-rain"></canvas>
+    <canvas id="particles"></canvas>
+
+    <!-- ═══════════════════════════════════════
+         КАСТОМНЫЙ КУРСОР
+    ═══════════════════════════════════════ -->
+    <div class="cursor-dot" id="cursor-dot"></div>
+    <div class="cursor-ring" id="cursor-ring"></div>
+    <div class="cursor-spotlight" id="cursor-spotlight"></div>
+
+    <!-- ═══════════════════════════════════════
+         EASTER EGG УВЕДОМЛЕНИЕ
+    ═══════════════════════════════════════ -->
+    <div class="easter-egg-notification" id="easter-egg-notif">
+      SECRET UNLOCKED!
+    </div>
+
+    <!-- ═══════════════════════════════════════
+         ОСНОВНОЕ ПРИЛОЖЕНИЕ
+    ═══════════════════════════════════════ -->
+    <div id="root"></div>
+
+    <script type="module" src="/src/main.tsx"></script>
+
+    <!-- ═══════════════════════════════════════
+         СКРИПТЫ ЭФФЕКТОВ
+    ═══════════════════════════════════════ -->
+    <script>
+      (function() {
+        'use strict';
+
+        // ═══════════════════════════════════════
+        // BOOT SEQUENCE
+        // ═══════════════════════════════════════
+        const bootScreen = document.getElementById('boot-screen');
+        const bootProgress = document.querySelector('.boot-progress');
+        const bootPercentage = document.querySelector('.boot-percentage');
+        const bootTexts = document.querySelectorAll('.boot-text');
+        
+        let progress = 0;
+        const totalSteps = bootTexts.length;
+        let currentStep = 0;
+
+        function updateProgress() {
+          progress += Math.random() * 3 + 1;
+          if (progress > 100) progress = 100;
+          
+          bootProgress.style.setProperty('--progress', progress + '%');
+          bootPercentage.textContent = Math.floor(progress) + '%';
+
+          // Показываем текст поэтапно
+          const targetStep = Math.floor((progress / 100) * totalSteps);
+          while (currentStep < targetStep && currentStep < bootTexts.length) {
+            bootTexts[currentStep].classList.add('visible');
+            currentStep++;
+          }
+
+          if (progress < 100) {
+            setTimeout(updateProgress, 100 + Math.random() * 200);
+          } else {
+            // Все тексты показаны
+            bootTexts.forEach(t => t.classList.add('visible'));
+            
+            setTimeout(() => {
+              bootScreen.classList.add('fade-out');
+              setTimeout(() => {
+                bootScreen.classList.add('hidden');
+              }, 1000);
+            }, 1000);
+          }
+        }
+
+        setTimeout(updateProgress, 500);
+
+        // ═══════════════════════════════════════
+        // КАСТОМНЫЙ КУРСОР
+        // ═══════════════════════════════════════
+        const cursorDot = document.getElementById('cursor-dot');
+        const cursorRing = document.getElementById('cursor-ring');
+        const cursorSpotlight = document.getElementById('cursor-spotlight');
+
+        let mouseX = 0, mouseY = 0;
+        let ringX = 0, ringY = 0;
+
+        document.addEventListener('mousemove', (e) => {
+          mouseX = e.clientX;
+          mouseY = e.clientY;
+          
+          cursorDot.style.left = mouseX + 'px';
+          cursorDot.style.top = mouseY + 'px';
+          
+          cursorSpotlight.style.left = mouseX + 'px';
+          cursorSpotlight.style.top = mouseY + 'px';
+        });
+
+        // Плавное следование кольца
+        function animateCursor() {
+          ringX += (mouseX - ringX) * 0.15;
+          ringY += (mouseY - ringY) * 0.15;
+          
+          cursorRing.style.left = ringX + 'px';
+          cursorRing.style.top = ringY + 'px';
+          cursorRing.style.transform = 'translate(-50%, -50%)';
+          
+          cursorDot.style.transform = 'translate(-50%, -50%)';
+          
+          requestAnimationFrame(animateCursor);
+        }
+        animateCursor();
+
+        // Эффекты при клике и наведении
+        document.addEventListener('mousedown', () => {
+          cursorRing.classList.add('clicking');
+          cursorDot.style.transform = 'translate(-50%, -50%) scale(0.5)';
+        });
+
+        document.addEventListener('mouseup', () => {
+          cursorRing.classList.remove('clicking');
+          cursorDot.style.transform = 'translate(-50%, -50%) scale(1)';
+        });
+
+        document.querySelectorAll('a, button').forEach(el => {
+          el.addEventListener('mouseenter', () => cursorRing.classList.add('hovering'));
+          el.addEventListener('mouseleave', () => cursorRing.classList.remove('hovering'));
+        });
+
+        // Скрываем кастомный курсор на мобильных
+        if ('ontouchstart' in window) {
+          cursorDot.style.display = 'none';
+          cursorRing.style.display = 'none';
+          cursorSpotlight.style.display = 'none';
+        }
+
+        // ═══════════════════════════════════════
+        // МАТРИЧНЫЙ ДОЖДЬ
+        // ═══════════════════════════════════════
+        const matrixCanvas = document.getElementById('matrix-rain');
+        const matrixCtx = matrixCanvas.getContext('2d');
+
+        function resizeMatrix() {
+          matrixCanvas.width = window.innerWidth;
+          matrixCanvas.height = window.innerHeight;
+        }
+        resizeMatrix();
+        window.addEventListener('resize', resizeMatrix);
+
+        const chars = 'アイウエオカキクケコサシスセソタチツテトナニヌネノハヒフヘホマミムメモヤユヨラリルレロワヲン0123456789ABCDEF{}[]<>/*-+=';
+        const fontSize = 14;
+        let columns = matrixCanvas.width / fontSize;
+        let drops = [];
+
+        for (let i = 0; i < columns; i++) {
+          drops[i] = Math.random() * -100;
+        }
+
+        function drawMatrix() {
+          matrixCtx.fillStyle = 'rgba(0, 0, 0, 0.05)';
+          matrixCtx.fillRect(0, 0, matrixCanvas.width, matrixCanvas.height);
+          
+          matrixCtx.fillStyle = '#00ff41';
+          matrixCtx.font = fontSize + 'px monospace';
+
+          for (let i = 0; i < drops.length; i++) {
+            const char = chars[Math.floor(Math.random() * chars.length)];
+            const x = i * fontSize;
+            const y = drops[i] * fontSize;
+
+            // Яркая "голова" капли
+            if (Math.random() > 0.98) {
+              matrixCtx.fillStyle = '#ffffff';
+            } else {
+              matrixCtx.fillStyle = '#00ff41';
+            }
+
+            matrixCtx.fillText(char, x, y);
+
+            if (y > matrixCanvas.height && Math.random() > 0.975) {
+              drops[i] = 0;
+            }
+            drops[i]++;
+          }
+        }
+
+        setInterval(drawMatrix, 50);
+
+        // ═══════════════════════════════════════
+        // PARTICLES
+        // ═══════════════════════════════════════
+        const particleCanvas = document.getElementById('particles');
+        const particleCtx = particleCanvas.getContext('2d');
+
+        function resizeParticles() {
+          particleCanvas.width = window.innerWidth;
+          particleCanvas.height = window.innerHeight;
+        }
+        resizeParticles();
+        window.addEventListener('resize', resizeParticles);
+
+        const particles = [];
+        const particleCount = 50;
+
+        class Particle {
+          constructor() {
+            this.reset();
+          }
+
+          reset() {
+            this.x = Math.random() * particleCanvas.width;
+            this.y = Math.random() * particleCanvas.height;
+            this.vx = (Math.random() - 0.5) * 0.5;
+            this.vy = (Math.random() - 0.5) * 0.5;
+            this.size = Math.random() * 2 + 1;
+            this.opacity = Math.random() * 0.5 + 0.2;
+          }
+
+          update() {
+            this.x += this.vx;
+            this.y += this.vy;
+
+            // Притяжение к мыши
+            const dx = mouseX - this.x;
+            const dy = mouseY - this.y;
+            const dist = Math.sqrt(dx * dx + dy * dy);
+            if (dist < 150) {
+              this.vx += dx * 0.00005;
+              this.vy += dy * 0.00005;
+            }
+
+            // Границы
+            if (this.x < 0 || this.x > particleCanvas.width) this.vx *= -1;
+            if (this.y < 0 || this.y > particleCanvas.height) this.vy *= -1;
+          }
+
+          draw() {
+            particleCtx.beginPath();
+            particleCtx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+            particleCtx.fillStyle = `rgba(0, 255, 65, ${this.opacity})`;
+            particleCtx.fill();
+          }
+        }
+
+        for (let i = 0; i < particleCount; i++) {
+          particles.push(new Particle());
+        }
+
+        function animateParticles() {
+          particleCtx.clearRect(0, 0, particleCanvas.width, particleCanvas.height);
+
+          particles.forEach((p, i) => {
+            p.update();
+            p.draw();
+
+            // Соединяем близкие частицы
+            for (let j = i + 1; j < particles.length; j++) {
+              const p2 = particles[j];
+              const dx = p.x - p2.x;
+              const dy = p.y - p2.y;
+              const dist = Math.sqrt(dx * dx + dy * dy);
+
+              if (dist < 120) {
+                particleCtx.beginPath();
+                particleCtx.moveTo(p.x, p.y);
+                particleCtx.lineTo(p2.x, p2.y);
+                particleCtx.strokeStyle = `rgba(0, 255, 65, ${0.1 * (1 - dist / 120)})`;
+                particleCtx.lineWidth = 0.5;
+                particleCtx.stroke();
+              }
+            }
+          });
+
+          requestAnimationFrame(animateParticles);
+        }
+        animateParticles();
+
+        // ═══════════════════════════════════════
+        // DATA STREAMS (боковые потоки данных)
+        // ═══════════════════════════════════════
+        function generateDataStream() {
+          const dataTypes = [
+            () => '0x' + Math.random().toString(16).substr(2, 8).toUpperCase(),
+            () => Math.random().toString(2).substr(2, 16),
+            () => 'IP:' + [1,2,3,4].map(() => Math.floor(Math.random()*256)).join('.'),
+            () => 'PKT:' + Math.floor(Math.random() * 99999),
+            () => 'SYN:' + (Math.random() > 0.5 ? 'ACK' : 'FIN'),
+            () => 'PORT:' + Math.floor(Math.random() * 65535),
+            () => '█'.repeat(Math.floor(Math.random() * 10) + 1),
+            () => '[' + ['OK', 'ERR', 'WARN', 'INFO'][Math.floor(Math.random() * 4)] + ']',
+            () => 'TTL:' + Math.floor(Math.random() * 64),
+            () => Math.random().toString(36).substr(2, 12).toUpperCase(),
+          ];
+
+          let content = '';
+          for (let i = 0; i < 100; i++) {
+            const generator = dataTypes[Math.floor(Math.random() * dataTypes.length)];
+            content += generator() + '\n';
+          }
+          return content + content; // Дублируем для бесшовного скролла
+        }
+
+        document.getElementById('data-stream-left').textContent = generateDataStream();
+        document.getElementById('data-stream-right').textContent = generateDataStream();
+
+        // ═══════════════════════════════════════
+        // HUD UPDATES
+        // ═══════════════════════════════════════
+        // FPS Counter
+        let lastTime = performance.now();
+        let frameCount = 0;
+        const fpsDisplay = document.getElementById('hud-fps');
+
+        function updateFPS() {
+          frameCount++;
+          const now = performance.now();
+          if (now - lastTime >= 1000) {
+            fpsDisplay.textContent = 'FPS: ' + frameCount;
+            frameCount = 0;
+            lastTime = now;
+          }
+          requestAnimationFrame(updateFPS);
+        }
+        updateFPS();
+
+        // Time
+        const timeDisplay = document.getElementById('hud-time');
+        function updateTime() {
+          const now = new Date();
+          timeDisplay.textContent = now.toLocaleTimeString('ru-RU');
+        }
+        setInterval(updateTime, 1000);
+        updateTime();
+
+        // ═══════════════════════════════════════
+        // BOSS MODE
+        // ═══════════════════════════════════════
+        const bossOverlay = document.getElementById('boss-overlay');
+        const bossStripesTop = document.getElementById('boss-stripes-top');
+        const bossStripesBottom = document.getElementById('boss-stripes-bottom');
+
+        window.addEventListener('boss-mode-on', () => {
+          bossOverlay.classList.add('active');
+          bossStripesTop.classList.add('active');
+          bossStripesBottom.classList.add('active');
+          document.body.setAttribute('data-boss-mode', 'true');
+        });
+
+        window.addEventListener('boss-mode-off', () => {
+          bossOverlay.classList.remove('active');
+          bossStripesTop.classList.remove('active');
+          bossStripesBottom.classList.remove('active');
+          document.body.removeAttribute('data-boss-mode');
+        });
+
+        // ═══════════════════════════════════════
+        // EASTER EGGS
+        // ═══════════════════════════════════════
+        const easterEggNotif = document.getElementById('easter-egg-notif');
+        let konamiCode = [];
+        const konamiSequence = ['ArrowUp', 'ArrowUp', 'ArrowDown', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'ArrowLeft', 'ArrowRight', 'b', 'a'];
+
+        function showEasterEgg(message) {
+          easterEggNotif.textContent = '🔓 ' + message;
+          easterEggNotif.classList.add('show');
+          setTimeout(() => {
+            easterEggNotif.classList.remove('show');
+          }, 3000);
+        }
+
+        document.addEventListener('keydown', (e) => {
+          konamiCode.push(e.key);
+          if (konamiCode.length > 10) konamiCode.shift();
+          
+          if (konamiCode.join(',') === konamiSequence.join(',')) {
+            showEasterEgg('KONAMI CODE ACTIVATED! +1000 XP');
+            const currentXP = Number(localStorage.getItem('userXP') || '0');
+            localStorage.setItem('userXP', String(currentXP + 1000));
+            konamiCode = [];
+            
+            // Эффект
+            document.body.style.filter = 'hue-rotate(180deg)';
+            setTimeout(() => {
+              document.body.style.filter = '';
+            }, 2000);
+          }
+
+          // Другие easter eggs
+          if (e.key === 'F12') {
+            // Показываем при открытии devtools
+          }
+        });
+
+        // Секретная комбинация: HACK
+        let hackCode = '';
+        document.addEventListener('keypress', (e) => {
+          hackCode += e.key.toLowerCase();
+          if (hackCode.length > 4) hackCode = hackCode.slice(-4);
+          
+          if (hackCode === 'hack') {
+            showEasterEgg('HACK MODE ENABLED! You found a secret!');
+            hackCode = '';
+          }
+        });
+
+        // ═══════════════════════════════════════
+        // KEYBOARD SHORTCUTS
+        // ═══════════════════════════════════════
+        document.addEventListener('keydown', (e) => {
+          // Ctrl+Shift+D - Debug mode
+          if (e.ctrlKey && e.shiftKey && e.key === 'D') {
+            e.preventDefault();
+            document.body.classList.toggle('debug-mode');
+            showEasterEgg('Debug Mode Toggled');
+          }
+
+          // Escape - Remove effects temporarily
+          if (e.key === 'Escape') {
+            const overlays = document.querySelectorAll('.scanlines, .flicker-overlay, .noise-overlay');
+            overlays.forEach(o => o.style.display = o.style.display === 'none' ? '' : 'none');
+          }
+        });
+
+        // ═══════════════════════════════════════
+        // AMBIENT AUDIO (опционально)
+        // ═══════════════════════════════════════
+        let audioContext = null;
+
+        function playAmbientTone() {
+          if (!audioContext) {
+            audioContext = new (window.AudioContext || window.webkitAudioContext)();
+          }
+
+          const osc = audioContext.createOscillator();
+          const gain = audioContext.createGain();
+          
+          osc.frequency.value = 40 + Math.random() * 20;
+          osc.type = 'sine';
+          
+          gain.gain.setValueAtTime(0, audioContext.currentTime);
+          gain.gain.linearRampToValueAtTime(0.02, audioContext.currentTime + 0.5);
+          gain.gain.linearRampToValueAtTime(0, audioContext.currentTime + 2);
+          
+          osc.connect(gain);
+          gain.connect(audioContext.destination);
+          
+          osc.start();
+          osc.stop(audioContext.currentTime + 2);
+        }
+
+        // Включение звука только после взаимодействия
+        let audioEnabled = false;
+        document.addEventListener('click', () => {
+          if (!audioEnabled) {
+            audioEnabled = true;
+            // setInterval(playAmbientTone, 5000); // Раскомментировать для фонового гула
+          }
+        }, { once: true });
+
+        // ═══════════════════════════════════════
+        // PERFORMANCE OPTIMIZATION
+        // ═══════════════════════════════════════
+        // Reduce effects when tab is not visible
+        document.addEventListener('visibilitychange', () => {
+          if (document.hidden) {
+            document.body.classList.add('reduced-motion');
+          } else {
+            document.body.classList.remove('reduced-motion');
+          }
+        });
+
+        // Log ready status
+        console.log('%c⬡ CODEFLOW TERMINAL READY ⬡', 
+          'color: #00ff41; font-size: 20px; font-weight: bold; text-shadow: 0 0 10px #00ff41;');
+        console.log('%cType "help" in the terminal for available commands.', 
+          'color: #00fff9; font-size: 12px;');
+
+      })();
+    </script>
+  </body>
+</html>
