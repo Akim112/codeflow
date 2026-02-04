@@ -1,5 +1,5 @@
 # CI для CodeFlow (frontend)
-name: CI
+name: CI Frontend
 
 on:
   push:
