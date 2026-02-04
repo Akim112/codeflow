@@ -228,7 +228,7 @@ export const TimeDebugger = ({ code, onClose }: TimeDebuggerProps) => {
     });
 
     try {
-      // eslint-disable-next-line no-eval
+       
       return eval(processedExpr);
     } catch {
       return processedExpr.replace(/['"]/g, '');
