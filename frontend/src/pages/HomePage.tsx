@@ -4,6 +4,7 @@ import { Typewriter } from 'react-simple-typewriter';
 import { IconRocket, IconTrophy, IconShoppingCart, IconUser, IconCode, IconShield } from '@tabler/icons-react';
 import { motion } from 'framer-motion';
 import { useEffect, useState } from 'react';
+import { syncServerStateToLocalStorage } from '../api';
 import { MatrixRain } from '../components/MatrixRain';
 import { ParticleBackground } from '../components/ParticleBackground';
 import { GlitchText } from '../components/GlitchText';
@@ -13,7 +14,12 @@ const HomePage = () => {
   const [showContent, setShowContent] = useState(false);
 
   useEffect(() => {
-    setUserXP(Number(localStorage.getItem('userXP')) || 0);
+    const load = async () => {
+      await syncServerStateToLocalStorage().catch(() => undefined);
+      setUserXP(Number(localStorage.getItem('userXP')) || 0);
+    };
+
+    load().catch(console.error);
     const timer = setTimeout(() => setShowContent(true), 500);
     return () => clearTimeout(timer);
   }, []);

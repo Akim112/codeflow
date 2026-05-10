@@ -13,6 +13,7 @@ import ShopPage from './pages/ShopPage';
 import { PageTransition } from './components/PageTransition';
 import { CyberLoader } from './components/CyberLoader';
 import { terminalThemes } from './data/shopItems';
+import { bootstrapAuth, syncServerStateToLocalStorage } from './api';
 
 const getPrimaryColor = (id: string) => {
   switch (id) {
@@ -57,6 +58,15 @@ function App() {
     }, 100);
 
     return () => clearInterval(interval);
+  }, []);
+
+
+  useEffect(() => {
+    const initServer = async () => {
+      await bootstrapAuth().catch(() => undefined);
+      await syncServerStateToLocalStorage().catch(() => undefined);
+    };
+    initServer().catch(console.error);
   }, []);
 
   // Обновление темы

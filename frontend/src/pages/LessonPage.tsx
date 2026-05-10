@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef, lazy, Suspense } from 'react';
+import { useState, useEffect, useCallback, lazy, Suspense } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import confetti from 'canvas-confetti';
 import {
@@ -12,17 +12,15 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Typewriter } from 'react-simple-typewriter';
 
 import { lessons } from '../data/lessons';
-import { achievements, calculateStats } from '../data/achievements';
 import { createGlitchState, glitchAvatars } from '../data/glitchCharacter';
 import { TimeDebugger } from '../components/TimeDebugger';
 import { InteractiveTheory } from '../components/InteractiveTheory';
 import { HackerConsole } from '../components/HackerConsole';
 import { MoralChoice } from '../components/MoralChoice';
-import { awardMissionReputation, getXPMultiplier } from '../data/reputationSystem';
 import { music } from '../utils/adaptiveMusic';
 import { sounds } from '../utils/audio';
 import { MatrixRain } from '../components/MatrixRain';
-import { pyodideWorkerScript } from '../utils/workerScript';
+import { api, syncServerStateToLocalStorage } from '../api';
 
 // Ленивая загрузка Monaco Editor для ускорения первоначальной загрузки страницы
 const Editor = lazy(() => import('@monaco-editor/react'));
@@ -41,8 +39,6 @@ const LessonPage = () => {
   const [code, setCode] = useState("");
   const [output, setOutput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const [isPyodideReady, setIsPyodideReady] = useState(false);
-  const [pyodideError, setPyodideError] = useState<string | null>(null);
   const [isError, setIsError] = useState(false);
   const [errorCount, setErrorCount] = useState(0);
   const [glitchState, setGlitchState] = useState(createGlitchState({ type: 'welcome' }));
@@ -54,72 +50,10 @@ const LessonPage = () => {
   const [cleanStreak, setCleanStreak] = useState(0);
   const [typingProgress, setTypingProgress] = useState(0);
 
-  // Ref для отслеживания активных запросов к воркеру
-  const pendingRequests = useRef<Map<string, { resolve: (val: any) => void, reject: (err: any) => void, output: string }>>(new Map());
-  const workerRef = useRef<Worker | null>(null);
-
   const isBossMode = currentLesson?.isBoss || false;
   const themeColor = isBossMode ? 'red' : 'green';
   const terminalTextColor = isBossMode ? '#FF4136' : '#00FF41';
   const borderColor = isBossMode ? '#FF4136' : '#1A1B1E';
-
-  // --- ИНИЦИАЛИЗАЦИЯ WORKER ---
-  useEffect(() => {
-    // Инициализируем воркер из Blob, что гарантирует загрузку скрипта
-    const blob = new Blob([pyodideWorkerScript], { type: 'application/javascript' });
-    const workerUrl = URL.createObjectURL(blob);
-    workerRef.current = new Worker(workerUrl);
-
-    workerRef.current.onmessage = (event) => {
-      const { type, error, id, output, message } = event.data;
-
-      if (type === 'READY') {
-        console.log('Pyodide Worker READY');
-        setIsPyodideReady(true);
-        setPyodideError(null);
-      } else if (type === 'LOG') {
-        console.log('[Worker]', message);
-      } else if (type === 'ERROR') {
-        if (id && pendingRequests.current.has(id)) {
-          const req = pendingRequests.current.get(id);
-          req?.reject(new Error(error));
-          pendingRequests.current.delete(id);
-        } else {
-          console.error('Pyodide Worker Error:', error);
-          setPyodideError(error || 'Ошибка инициализации Python ядра');
-        }
-      } else if (type === 'OUTPUT') {
-        if (id && pendingRequests.current.has(id)) {
-          const req = pendingRequests.current.get(id)!;
-          req.output += output + "\n";
-          // Обновляем UI в реальном времени
-          setOutput(prev => prev + output + "\n");
-        }
-      } else if (type === 'WithResult') {
-        if (id && pendingRequests.current.has(id)) {
-          const req = pendingRequests.current.get(id)!;
-          req.resolve(req.output); // Возвращаем накопленный вывод
-          pendingRequests.current.delete(id);
-        }
-      }
-    };
-
-    // Запускаем инициализацию в воркере
-    workerRef.current.postMessage({ type: 'INIT' });
-
-    // Таймаут на случай если воркер зависнет
-    const timeoutId = setTimeout(() => {
-      if (!isPyodideReady) {
-        setPyodideError('Превышено время ожидания загрузки ядра. Обновите страницу.');
-      }
-    }, 45000);
-
-    return () => {
-      clearTimeout(timeoutId);
-      workerRef.current?.terminate();
-      URL.revokeObjectURL(workerUrl);
-    };
-  }, []);
 
   // --- ИНИЦИАЛИЗАЦИЯ УРОКА ---
   useEffect(() => {
@@ -183,10 +117,15 @@ const LessonPage = () => {
     const price = unlockedHints === 0 ? 50 : 150;
 
     if (currentXP >= price) {
-      localStorage.setItem('userXP', String(currentXP - price));
-      setUnlockedHints(prev => prev + 1);
-      sounds.success();
-      setGlitchState(createGlitchState({ type: 'hint' }));
+      api.purchaseHint(price).then(async () => {
+        await syncServerStateToLocalStorage().catch(() => undefined);
+        setUnlockedHints(prev => prev + 1);
+        sounds.success();
+        setGlitchState(createGlitchState({ type: 'hint' }));
+      }).catch(() => {
+        sounds.error();
+        alert("НЕДОСТАТОЧНО XP!");
+      });
     } else {
       sounds.error();
       alert("НЕДОСТАТОЧНО XP!");
@@ -195,7 +134,7 @@ const LessonPage = () => {
 
   // --- ЗАПУСК КОДА ---
   const handleRunCode = useCallback(async () => {
-    if (timeLeft === 0 || !currentLesson || !isPyodideReady || !workerRef.current) return;
+    if (timeLeft === 0 || !currentLesson) return;
 
     sounds.click();
     music.start('coding');
@@ -207,18 +146,11 @@ const LessonPage = () => {
     await new Promise(res => setTimeout(res, 800));
 
     try {
-      const resultOutput = await new Promise<string>((resolve, reject) => {
-        const id = Date.now().toString() + Math.random().toString();
-        pendingRequests.current.set(id, { resolve, reject, output: "" });
+      const submitResult = await api.submitLesson(lessonId, code);
+      const resultOutput = submitResult.output || '';
+      setOutput(resultOutput || '> Выполнение завершено без вывода\n');
 
-        workerRef.current?.postMessage({
-          type: 'RUN_CODE',
-          code,
-          id
-        });
-      });
-
-      if (resultOutput.trim() === currentLesson.expectedOutput) {
+      if (submitResult.passed) {
         // УСПЕХ
         music.start('victory');
         sounds.success();
@@ -236,12 +168,8 @@ const LessonPage = () => {
         setTimeout(() => confetti({ particleCount: 100, angle: 60, spread: 55, origin: { x: 0 } }), 200);
         setTimeout(() => confetti({ particleCount: 100, angle: 120, spread: 55, origin: { x: 1 } }), 400);
 
-        // XP с множителем
-        const finalXP = Math.floor(currentLesson.xp * getXPMultiplier());
-        localStorage.setItem('userXP', String((Number(localStorage.getItem('userXP')) || 0) + finalXP));
-
-        // Репутация
-        awardMissionReputation(lessonId, errorCount === 0);
+        const progressResult = await api.completeLesson(lessonId, errorCount === 0).catch(() => null);
+        await syncServerStateToLocalStorage().catch(() => undefined);
 
         // Прогресс
         const completedRaw = localStorage.getItem('completedLessons');
@@ -261,24 +189,9 @@ const LessonPage = () => {
           localStorage.setItem('fastBossKill', 'true');
         }
 
-        // Проверка достижений
-        let achievementMessage = "";
-        const stats = calculateStats();
-        const unlockedRaw = localStorage.getItem('unlockedAchievements');
-        let unlocked: string[] = unlockedRaw ? JSON.parse(unlockedRaw) : [];
-
-        achievements.forEach(ach => {
-          if (!unlocked.includes(ach.id) && ach.condition(stats)) {
-            unlocked.push(ach.id);
-            localStorage.setItem('unlockedAchievements', JSON.stringify(unlocked));
-            achievementMessage += `\n🏆 ДОСТИЖЕНИЕ: ${ach.title}!`;
-            sounds.success();
-          }
-        });
-
         setNotification({
           type: 'success',
-          message: `ДОСТУП ПОЛУЧЕН! +${finalXP} XP${achievementMessage}`
+          message: `ДОСТУП ПОЛУЧЕН! +${progressResult?.xpEarned ?? currentLesson.xp} XP`
         });
 
         // Моральный выбор на боссах
@@ -288,15 +201,19 @@ const LessonPage = () => {
 
         setErrorCount(0);
       } else {
-        // НЕВЕРНЫЙ ОТВЕТ
-        handleError(`> ОШИБКА: Неверный результат.\n> ОЖИДАЛОСЬ: ${currentLesson.expectedOutput}\n> ПОЛУЧЕНО: ${resultOutput.trim()}`);
+        if (submitResult.failureReason || submitResult.error) {
+          const reason = [submitResult.failureReason, submitResult.error].filter(Boolean).join('\n');
+          handleError(`> СИСТЕМНЫЙ СБОЙ:\n${reason}`);
+        } else {
+          handleError(`> ОШИБКА: Неверный результат.\n> ОЖИДАЛОСЬ: ${currentLesson.expectedOutput}\n> ПОЛУЧЕНО: ${resultOutput.trim()}`);
+        }
       }
     } catch (err: any) {
       handleError(`> СИСТЕМНЫЙ СБОЙ:\n${err.message}`);
     } finally {
       setIsLoading(false);
     }
-  }, [code, currentLesson, timeLeft, isPyodideReady, errorCount, cleanStreak, lessonId, isBossMode]);
+  }, [code, currentLesson, timeLeft, errorCount, cleanStreak, lessonId, isBossMode]);
 
   const handleError = (message: string) => {
     sounds.error();
@@ -420,18 +337,6 @@ const LessonPage = () => {
           </Group>
 
           <Group gap="xs">
-            {!isPyodideReady && !pyodideError && (
-              <Badge color="yellow" variant="light" leftSection={<Loader size={10} />}>
-                Загрузка Python...
-              </Badge>
-            )}
-
-            {pyodideError && (
-              <Badge color="red" variant="filled" title={pyodideError}>
-                ⚠️ Python недоступен
-              </Badge>
-            )}
-
             <Group gap={4}>
               <Kbd size="xs">Ctrl</Kbd>
               <Text size="xs" c="dimmed">+</Text>
@@ -606,8 +511,8 @@ const LessonPage = () => {
                   loading={isLoading}
                   fullWidth
                   size="lg"
-                  color={pyodideError ? 'red' : themeColor}
-                  disabled={timeLeft === 0 || !isPyodideReady || !!pyodideError}
+                  color={themeColor}
+                  disabled={timeLeft === 0}
                   leftSection={<IconPlayerPlay size={20} />}
                   styles={{
                     root: {
@@ -615,7 +520,7 @@ const LessonPage = () => {
                     }
                   }}
                 >
-                  {pyodideError ? "⚠️ Python недоступен" : isBossMode ? "⚡ ВЗЛОМАТЬ ЯДРО" : "▶ ВЫПОЛНИТЬ ВЗЛОМ"}
+                  {isBossMode ? "⚡ ВЗЛОМАТЬ ЯДРО" : "▶ ВЫПОЛНИТЬ ВЗЛОМ"}
                 </Button>
               </motion.div>
 
@@ -755,14 +660,12 @@ const LessonPage = () => {
                   <pre style={{
                     margin: 0,
                     whiteSpace: 'pre-wrap',
-                    color: pyodideError ? '#FF4136' : terminalTextColor,
+                    color: terminalTextColor,
                     fontFamily: 'JetBrains Mono, monospace',
                     fontSize: '14px',
-                    textShadow: `0 0 10px ${pyodideError ? '#FF4136' : terminalTextColor}`,
+                    textShadow: `0 0 10px ${terminalTextColor}`,
                   }}>
-                    {pyodideError
-                      ? `> ОШИБКА СИСТЕМЫ\n> ${pyodideError}\n>\n> Попробуйте:\n> 1. Обновить страницу (F5)\n> 2. Проверить подключение к интернету\n> 3. Использовать VPN если CDN заблокирован`
-                      : output || '> Ожидание выполнения кода..._'}
+                    {output || '> Ожидание выполнения кода..._'}
                   </pre>
                 </Tabs.Panel>
 

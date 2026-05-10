@@ -1,6 +1,7 @@
 import { Container, Title, Text, Paper, Group, RingProgress, Stack, Button, Badge, SimpleGrid, Progress, Divider, ThemeIcon } from '@mantine/core';
 import { Link } from 'react-router-dom';
 import { useEffect, useState } from 'react';
+import { api, syncServerStateToLocalStorage } from '../api';
 import { IconTrophy, IconFlame, IconClock, IconShoppingCart, IconChartBar } from '@tabler/icons-react';
 import { achievements, calculateStats } from '../data/achievements';
 import { factions, getReputation, isFactionUnlocked, type ReputationState } from '../data/reputationSystem';
@@ -12,15 +13,33 @@ const ProfilePage = () => {
   const [stats, setStats] = useState<any>({});
 
   useEffect(() => {
-    setXp(Number(localStorage.getItem('userXP')) || 0);
-    setUnlockedIds(JSON.parse(localStorage.getItem('unlockedAchievements') || '[]'));
+    const load = async () => {
+      await syncServerStateToLocalStorage().catch(() => undefined);
 
-    const savedRep = localStorage.getItem('reputation');
-    if (savedRep) {
-      setReputation(JSON.parse(savedRep));
-    }
+      const serverAchievements = await api.getMyAchievements().catch(() => []);
+      if (serverAchievements.length > 0) {
+        const ids = serverAchievements.map((a) => a.achievementId);
+        localStorage.setItem('unlockedAchievements', JSON.stringify(ids));
+      }
 
-    setStats(calculateStats());
+      const serverRep = await api.getMyReputation().catch(() => []);
+      if (serverRep.length > 0) {
+        const repMap = Object.fromEntries(serverRep.map((r) => [r.factionId, r.reputation]));
+        localStorage.setItem('reputation', JSON.stringify(repMap));
+      }
+
+      setXp(Number(localStorage.getItem('userXP')) || 0);
+      setUnlockedIds(JSON.parse(localStorage.getItem('unlockedAchievements') || '[]'));
+
+      const savedRep = localStorage.getItem('reputation');
+      if (savedRep) {
+        setReputation(JSON.parse(savedRep));
+      }
+
+      setStats(calculateStats());
+    };
+
+    load().catch(console.error);
   }, []);
 
   // Логика рангов
@@ -235,8 +254,10 @@ const ProfilePage = () => {
             variant="light" 
             onClick={() => { 
               if (confirm('⚠️ ВЫ УВЕРЕНЫ?\n\nВсе данные будут безвозвратно удалены!')) {
-                localStorage.clear(); 
-                window.location.reload(); 
+                api.resetProgress()
+                  .then(() => syncServerStateToLocalStorage())
+                  .then(() => window.location.reload())
+                  .catch(() => alert('Не удалось сбросить профиль на сервере.'));
               }
             }}
           >

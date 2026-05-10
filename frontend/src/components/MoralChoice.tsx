@@ -1,7 +1,7 @@
 import { Modal, Button, Title, Text, Stack, Box } from '@mantine/core';
-import { addReputation } from '../data/reputationSystem';
 import { sounds } from '../utils/audio';
 import { motion } from 'framer-motion';
+import { api, syncServerStateToLocalStorage } from '../api';
 
 interface Props {
   opened: boolean;
@@ -10,12 +10,9 @@ interface Props {
 }
 
 export const MoralChoice = ({ opened, onClose, chapter }: Props) => {
-  const handleChoice = (factionId: string, xpBonus: number) => {
-    addReputation(factionId, 50);
-    
-    const currentXP = Number(localStorage.getItem('userXP') || '0');
-    localStorage.setItem('userXP', String(currentXP + xpBonus));
-    
+  const handleChoice = async (factionId: string, xpBonus: number) => {
+    await api.moralChoice(factionId, xpBonus, 50);
+    await syncServerStateToLocalStorage().catch(() => undefined);
     sounds.success();
     onClose();
   };
@@ -112,7 +109,7 @@ export const MoralChoice = ({ opened, onClose, chapter }: Props) => {
                 color={choice.color} 
                 size="lg"
                 fullWidth
-                onClick={() => handleChoice(choice.faction, choice.xp)}
+                onClick={() => handleChoice(choice.faction, choice.xp).catch(() => undefined)}
                 styles={{
                   root: {
                     height: 'auto',

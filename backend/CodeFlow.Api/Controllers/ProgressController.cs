@@ -39,4 +39,34 @@ public class ProgressController : ControllerBase
         if (result == null) return BadRequest(new { message = "Lesson not found or already completed." });
         return Ok(result);
     }
+
+    [HttpPost("purchase-hint")]
+    public async Task<ActionResult<XpBalanceDto>> PurchaseHint([FromBody] PurchaseHintRequest request, CancellationToken ct)
+    {
+        var userId = UserId;
+        if (userId == null) return Unauthorized();
+        var result = await _progress.PurchaseHintAsync(userId.Value, request, ct);
+        if (result == null) return BadRequest(new { message = "Not enough XP or invalid price." });
+        return Ok(result);
+    }
+
+    [HttpPost("moral-choice")]
+    public async Task<ActionResult<XpBalanceDto>> MoralChoice([FromBody] MoralChoiceRequest request, CancellationToken ct)
+    {
+        var userId = UserId;
+        if (userId == null) return Unauthorized();
+        var result = await _progress.ApplyMoralChoiceAsync(userId.Value, request, ct);
+        if (result == null) return BadRequest(new { message = "Invalid moral choice payload." });
+        return Ok(result);
+    }
+
+    [HttpPost("reset")]
+    public async Task<ActionResult> Reset(CancellationToken ct)
+    {
+        var userId = UserId;
+        if (userId == null) return Unauthorized();
+        var ok = await _progress.ResetProgressAsync(userId.Value, ct);
+        if (!ok) return NotFound();
+        return Ok(new { message = "Progress reset completed." });
+    }
 }

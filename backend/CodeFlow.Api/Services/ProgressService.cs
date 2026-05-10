@@ -92,6 +92,55 @@ public class ProgressService : IProgressService
         );
     }
 
+    public async Task<XpBalanceDto?> PurchaseHintAsync(Guid userId, PurchaseHintRequest request, CancellationToken ct = default)
+    {
+        var user = await _db.Users.FirstOrDefaultAsync(u => u.Id == userId, ct);
+        if (user == null) return null;
+        if (request.Price <= 0) return null;
+        if (user.TotalXp < request.Price) return null;
+
+        user.TotalXp -= request.Price;
+        await _db.SaveChangesAsync(ct);
+        return new XpBalanceDto(user.TotalXp);
+    }
+
+    public async Task<XpBalanceDto?> ApplyMoralChoiceAsync(Guid userId, MoralChoiceRequest request, CancellationToken ct = default)
+    {
+        var user = await _db.Users.FirstOrDefaultAsync(u => u.Id == userId, ct);
+        if (user == null) return null;
+        if (string.IsNullOrWhiteSpace(request.FactionId) || request.XpBonus < 0 || request.ReputationBonus < 0) return null;
+
+        var factionExists = await _db.Factions.AnyAsync(f => f.Id == request.FactionId, ct);
+        if (!factionExists) return null;
+
+        user.TotalXp += request.XpBonus;
+        await AddReputationAsync(userId, request.FactionId, request.ReputationBonus, ct);
+        await RecalculateAndGrantAchievementsAsync(userId, ct);
+        await _db.SaveChangesAsync(ct);
+        return new XpBalanceDto(user.TotalXp);
+    }
+
+    public async Task<bool> ResetProgressAsync(Guid userId, CancellationToken ct = default)
+    {
+        var user = await _db.Users
+            .Include(u => u.Progress)
+            .Include(u => u.Achievements)
+            .Include(u => u.Reputation)
+            .Include(u => u.OwnedShopItems)
+            .Include(u => u.Notifications)
+            .FirstOrDefaultAsync(u => u.Id == userId, ct);
+        if (user == null) return false;
+
+        user.TotalXp = 0;
+        _db.UserProgress.RemoveRange(user.Progress);
+        _db.UserAchievements.RemoveRange(user.Achievements);
+        _db.UserReputations.RemoveRange(user.Reputation);
+        _db.UserNotifications.RemoveRange(user.Notifications);
+        _db.UserShopItems.RemoveRange(user.OwnedShopItems.Where(i => i.ShopItemId != "classic"));
+        await _db.SaveChangesAsync(ct);
+        return true;
+    }
+
     private async Task AwardReputationAsync(Guid userId, int lessonId, bool wasCleanCode, CancellationToken ct)
     {
         if (lessonId >= 11 && lessonId <= 13)
