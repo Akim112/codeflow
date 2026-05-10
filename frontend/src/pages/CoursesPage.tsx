@@ -11,14 +11,9 @@ const CoursesPage = () => {
 
   useEffect(() => {
     const load = async () => {
-      try {
-        await syncServerStateToLocalStorage();
-      } catch {
-        // fallback to local cache
-      }
-
-      const savedProgress = localStorage.getItem('completedLessons');
-      if (savedProgress) setCompletedLessons(JSON.parse(savedProgress));
+      await syncServerStateToLocalStorage().catch(() => undefined);
+      const progress = await api.getMyProgress().catch(() => null);
+      setCompletedLessons(progress?.completedLessonIds ?? []);
 
       const loadedCourses = await api.getCourses();
       setCourses(loadedCourses);

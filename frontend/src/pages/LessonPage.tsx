@@ -11,7 +11,6 @@ import {
 import { motion, AnimatePresence } from 'framer-motion';
 import { Typewriter } from 'react-simple-typewriter';
 
-import { lessons } from '../data/lessons';
 import { createGlitchState, glitchAvatars } from '../data/glitchCharacter';
 import { TimeDebugger } from '../components/TimeDebugger';
 import { InteractiveTheory } from '../components/InteractiveTheory';
@@ -20,7 +19,7 @@ import { MoralChoice } from '../components/MoralChoice';
 import { music } from '../utils/adaptiveMusic';
 import { sounds } from '../utils/audio';
 import { MatrixRain } from '../components/MatrixRain';
-import { api, syncServerStateToLocalStorage } from '../api';
+import { api, syncServerStateToLocalStorage, type LessonDto } from '../api';
 
 // Ленивая загрузка Monaco Editor для ускорения первоначальной загрузки страницы
 const Editor = lazy(() => import('@monaco-editor/react'));
@@ -33,7 +32,8 @@ const LessonPage = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const lessonId = Number(id);
-  const currentLesson = lessons.find(l => l.id === lessonId);
+  const [currentLesson, setCurrentLesson] = useState<LessonDto | null>(null);
+  const [courseLessons, setCourseLessons] = useState<LessonDto[]>([]);
 
   // --- СОСТОЯНИЯ ---
   const [code, setCode] = useState("");
@@ -57,8 +57,16 @@ const LessonPage = () => {
 
   // --- ИНИЦИАЛИЗАЦИЯ УРОКА ---
   useEffect(() => {
-    if (currentLesson) {
-      setCode(currentLesson.initialCode);
+    let disposed = false;
+    const loadLesson = async () => {
+      const lesson = await api.getLessonById(lessonId);
+      if (disposed) return;
+      setCurrentLesson(lesson);
+      const list = await api.getCourseLessons(lesson.courseId).catch(() => []);
+      if (disposed) return;
+      setCourseLessons(list);
+
+      setCode(lesson.initialCode);
       setNotification({ type: null, message: '' });
       setIsError(false);
       setErrorCount(0);
@@ -68,7 +76,7 @@ const LessonPage = () => {
 
       setCleanStreak(Number(localStorage.getItem('cleanStreak') || '0'));
 
-      if (isBossMode) {
+      if (lesson.isBoss) {
         setTimeLeft(60);
         document.body.setAttribute('data-boss-mode', 'true');
         music.start('boss');
@@ -82,13 +90,15 @@ const LessonPage = () => {
         setOutput("");
         setGlitchState(createGlitchState({ type: 'welcome' }));
       }
+    };
+    loadLesson().catch(console.error);
 
-      return () => {
-        music.stop();
-        document.body.removeAttribute('data-boss-mode');
-      };
-    }
-  }, [lessonId, isBossMode, currentLesson]);
+    return () => {
+      disposed = true;
+      music.stop();
+      document.body.removeAttribute('data-boss-mode');
+    };
+  }, [lessonId]);
 
   // --- ТАЙМЕР ---
   useEffect(() => {
@@ -171,23 +181,8 @@ const LessonPage = () => {
         const progressResult = await api.completeLesson(lessonId, errorCount === 0).catch(() => null);
         await syncServerStateToLocalStorage().catch(() => undefined);
 
-        // Прогресс
-        const completedRaw = localStorage.getItem('completedLessons');
-        const completed: number[] = completedRaw ? JSON.parse(completedRaw) : [];
-        if (!completed.includes(lessonId)) {
-          completed.push(lessonId);
-          localStorage.setItem('completedLessons', JSON.stringify(completed));
-        }
-
-        // Clean streak
-        const newCleanStreak = errorCount === 0 ? cleanStreak + 1 : 0;
-        setCleanStreak(newCleanStreak);
-        localStorage.setItem('cleanStreak', String(newCleanStreak));
-
-        // Fast boss kill
-        if (isBossMode && timeLeft && timeLeft > 30) {
-          localStorage.setItem('fastBossKill', 'true');
-        }
+        const progress = await api.getMyProgress().catch(() => null);
+        setCleanStreak(progress?.cleanStreak ?? 0);
 
         setNotification({
           type: 'success',
@@ -254,7 +249,7 @@ const LessonPage = () => {
     );
   }
 
-  const nextLesson = lessons.find(l => l.id === lessonId + 1);
+  const nextLesson = courseLessons.find(l => l.id === lessonId + 1);
 
   return (
     <Box

@@ -17,6 +17,9 @@ async function request<T>(path: string, options: ReqOptions = {}): Promise<T> {
 
   const res = await fetch(`${API_BASE}${path}`, { ...options, headers });
   if (!res.ok) {
+    if (res.status === 401 || res.status === 403) {
+      localStorage.removeItem(TOKEN_KEY);
+    }
     const text = await res.text();
     throw new Error(text || `HTTP ${res.status}`);
   }
@@ -39,7 +42,15 @@ export interface FactionDto { id: string; name: string; description: string; ico
 export interface UserReputationDto { factionId: string; reputation: number; }
 
 async function ensureDemoAuth(): Promise<void> {
-  if (localStorage.getItem(TOKEN_KEY)) return;
+  const existing = localStorage.getItem(TOKEN_KEY);
+  if (existing) {
+    try {
+      await request<UserDto>('/api/users/me', { auth: true });
+      return;
+    } catch {
+      localStorage.removeItem(TOKEN_KEY);
+    }
+  }
 
   try {
     const login = await request<{ accessToken: string }>('/api/auth/login', {
@@ -70,6 +81,7 @@ export async function bootstrapAuth(): Promise<void> {
 
 export const api = {
   async getCourses() { return request<CourseDto[]>('/api/courses'); },
+  async getLessonById(id: number) { return request<LessonDto>(`/api/lessons/${id}`); },
   async getCourseLessons(id: number) { return request<LessonDto[]>(`/api/courses/${id}/lessons`); },
   async getLeaderboard(limit = 50) { return request<LeaderboardEntryDto[]>(`/api/leaderboard?limit=${limit}`); },
 
