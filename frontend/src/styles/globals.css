@@ -380,6 +380,20 @@ body::after {
   100% { background-position: -200% 0; }
 }
 
+/* Stable stat values for HomePage cards */
+.stats-value {
+  display: block;
+  text-align: center;
+  line-height: 1;
+  font-family: 'Orbitron', sans-serif;
+  letter-spacing: 0.03em;
+  color: #B8F5C9;
+  transform: translateY(-2px);
+  text-shadow:
+    0 0 6px rgba(130, 230, 170, 0.35),
+    0 0 12px rgba(90, 190, 130, 0.22);
+}
+
 /* ═══ ELECTRIC BORDER ═══ */
 .electric-border {
   position: relative;

@@ -213,7 +213,7 @@ const HomePage = () => {
                       style={{ textAlign: 'center' }}
                     >
                       <stat.icon size={32} color="var(--neon-green)" style={{ marginBottom: 10 }} />
-                      <Text size="2rem" fw={700} c="green" className="data-stream">
+                      <Text size="2rem" fw={800} c="green" className="stats-value">
                         {stat.value}
                       </Text>
                       <Text size="xs" c="dimmed" tt="uppercase" mt="xs">
