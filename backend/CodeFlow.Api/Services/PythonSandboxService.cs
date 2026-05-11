@@ -49,7 +49,7 @@ public class PythonSandboxService : IPythonSandboxService
             }
             catch (Exception ex)
             {
-                // Dev fallback: if Docker is unavailable, run locally with python3.
+                // Резервный запуск без Docker (только для локальной разработки).
                 _logger.LogWarning(ex, "Docker is unavailable, falling back to local python3 execution");
                 try
                 {

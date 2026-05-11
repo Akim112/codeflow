@@ -31,22 +31,18 @@ public class ProgressController : ControllerBase
     }
 
     [HttpPost("complete")]
-    public async Task<ActionResult<ProgressDto>> CompleteLesson([FromBody] CompleteLessonRequest request, CancellationToken ct)
+    public ActionResult CompleteLesson()
     {
-        var userId = UserId;
-        if (userId == null) return Unauthorized();
-        var result = await _progress.CompleteLessonAsync(userId.Value, request, ct);
-        if (result == null) return BadRequest(new { message = "Lesson not found or already completed." });
-        return Ok(result);
+        return BadRequest(new { message = "Завершение урока выполняется через проверку кода: POST /api/lessons/{id}/submit" });
     }
 
     [HttpPost("purchase-hint")]
-    public async Task<ActionResult<XpBalanceDto>> PurchaseHint([FromBody] PurchaseHintRequest request, CancellationToken ct)
+    public async Task<ActionResult<PurchaseHintResponseDto>> PurchaseHint([FromBody] PurchaseHintRequest request, CancellationToken ct)
     {
         var userId = UserId;
         if (userId == null) return Unauthorized();
         var result = await _progress.PurchaseHintAsync(userId.Value, request, ct);
-        if (result == null) return BadRequest(new { message = "Not enough XP or invalid price." });
+        if (result == null) return BadRequest(new { message = "Not enough XP or invalid hint request." });
         return Ok(result);
     }
 

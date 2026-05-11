@@ -11,12 +11,10 @@ export interface UserProfile {
 }
 
 export const usersApi = {
-    /** Get current user profile */
     getMe: async (): Promise<UserProfile> => {
         return await api.get('/api/users/me');
     },
 
-    /** Update current user profile */
     updateMe: async (displayName: string): Promise<UserProfile> => {
         return await api.patch('/api/users/me', { displayName });
     },

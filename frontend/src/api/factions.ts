@@ -16,12 +16,10 @@ export interface UserReputation {
 }
 
 export const factionsApi = {
-    /** Get all factions */
     getAll: async (): Promise<Faction[]> => {
         return await api.get('/api/factions');
     },
 
-    /** Get current user's reputation with factions */
     getMyReputation: async (): Promise<UserReputation[]> => {
         return await api.get('/api/factions/me');
     },

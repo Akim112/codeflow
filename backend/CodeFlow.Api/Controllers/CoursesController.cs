@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using CodeFlow.Api.Data;
@@ -34,13 +35,13 @@ public class CoursesController : ControllerBase
     }
 
     [HttpGet("{id:int}/lessons")]
-    public async Task<ActionResult<IEnumerable<LessonDto>>> GetLessons(int id, CancellationToken ct)
+    [Authorize]
+    public async Task<ActionResult<IEnumerable<LessonClientDto>>> GetLessons(int id, CancellationToken ct)
     {
         var lessons = await _db.Lessons
             .Where(l => l.CourseId == id)
             .OrderBy(l => l.Id)
-            .Select(l => new LessonDto(l.Id, l.CourseId, l.Chapter, l.Title, l.Description, l.Task, l.InitialCode, l.ExpectedOutput, l.Xp, l.IsBoss, l.HasDebugger, l.Hint, l.Hint2))
             .ToListAsync(ct);
-        return Ok(lessons);
+        return Ok(lessons.Select(l => l.ToClientDto()));
     }
 }

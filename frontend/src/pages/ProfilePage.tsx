@@ -22,7 +22,6 @@ const ProfilePage = () => {
   useEffect(() => {
     const loadAll = async () => {
       try {
-        // Load all data in parallelx
         const [userData, progressData, achievementsData, myAchievementsData, factionsData, reputationData] =
           await Promise.allSettled([
             usersApi.getMe(),
@@ -61,7 +60,6 @@ const ProfilePage = () => {
 
         if (reputationData.status === 'fulfilled') {
           setMyReputation(reputationData.value);
-          // Cache reputation
           const repObj: Record<string, number> = {};
           reputationData.value.forEach((r: UserReputation) => { repObj[r.factionId] = r.reputation; });
           localStorage.setItem('reputation', JSON.stringify(repObj));
@@ -82,7 +80,6 @@ const ProfilePage = () => {
     setIsResetting(true);
     try {
       await progressApi.resetProgress();
-      // Clear local cache
       localStorage.removeItem('completedLessons');
       localStorage.removeItem('unlockedAchievements');
       localStorage.removeItem('reputation');
@@ -133,16 +130,14 @@ const ProfilePage = () => {
     legendary: 'yellow'
   };
 
-  // Build reputation lookup
   const repLookup: Record<string, number> = {};
   myReputation.forEach(r => { repLookup[r.factionId] = r.reputation; });
 
   return (
     <Container size="lg" py="xl">
-      {/* Навигация */}
       <Group justify="space-between" mb="xl">
-        <Button variant="subtle" component={Link} to="/courses" leftSection={<span>←</span>}>
-          К МИССИЯМ
+        <Button variant="subtle" component={Link} to="/" leftSection={<span>←</span>}>
+          В ГЛАВНОЕ МЕНЮ
         </Button>
         <Group>
           <Button variant="light" color="yellow" component={Link} to="/shop" leftSection={<IconShoppingCart size={16} />}>

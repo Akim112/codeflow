@@ -17,7 +17,6 @@ const ShopPage = () => {
   useEffect(() => {
     const loadData = async () => {
       try {
-        // Load user XP from backend
         const user = await usersApi.getMe();
         setXp(user.totalXp);
         localStorage.setItem('userXP', String(user.totalXp));
@@ -26,10 +25,8 @@ const ShopPage = () => {
       }
 
       try {
-        // Load owned items from backend
         const myItems = await shopApi.getMyItems();
         const ownedIds = myItems.map(item => item.id);
-        // Always include 'classic' as it's the default free theme
         if (!ownedIds.includes('classic')) ownedIds.unshift('classic');
         setOwnedThemes(ownedIds);
         localStorage.setItem('ownedThemes', JSON.stringify(ownedIds));
@@ -47,10 +44,8 @@ const ShopPage = () => {
   const handleBuy = async (themeId: string, _price: number) => {
     setPurchasing(themeId);
     try {
-      // Purchase via backend
       await shopApi.purchase(themeId);
 
-      // Refresh user data to get updated XP
       const user = await usersApi.getMe();
       setXp(user.totalXp);
       localStorage.setItem('userXP', String(user.totalXp));

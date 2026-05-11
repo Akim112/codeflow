@@ -44,6 +44,7 @@ const createAppTheme = (primaryColor: string) => createTheme({
 });
 
 function App() {
+  const [, setAuthTick] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const [loadProgress, setLoadProgress] = useState(0);
   const [activeThemeId, setActiveThemeId] = useState(localStorage.getItem('activeTheme') || 'classic');
@@ -55,6 +56,12 @@ function App() {
     localStorage.setItem('hasSeenIntro', 'true');
     setHasSeenIntro(true);
   };
+
+  useEffect(() => {
+    const onAuthChange = () => setAuthTick(t => t + 1);
+    window.addEventListener('auth-changed', onAuthChange);
+    return () => window.removeEventListener('auth-changed', onAuthChange);
+  }, []);
 
   // Симуляция загрузки
   useEffect(() => {

@@ -20,28 +20,27 @@ public class AdminLessonsController : ControllerBase
     }
 
     [HttpGet]
-    public async Task<ActionResult<IEnumerable<LessonDto>>> GetAll([FromQuery] int? courseId, CancellationToken ct)
+    public async Task<ActionResult<IEnumerable<LessonAdminDto>>> GetAll([FromQuery] int? courseId, CancellationToken ct)
     {
         var query = _db.Lessons.AsQueryable();
         if (courseId.HasValue)
             query = query.Where(l => l.CourseId == courseId.Value);
         var list = await query
             .OrderBy(l => l.CourseId).ThenBy(l => l.Id)
-            .Select(l => new LessonDto(l.Id, l.CourseId, l.Chapter, l.Title, l.Description, l.Task, l.InitialCode, l.ExpectedOutput, l.Xp, l.IsBoss, l.HasDebugger, l.Hint, l.Hint2))
             .ToListAsync(ct);
-        return Ok(list);
+        return Ok(list.Select(l => l.ToAdminDto()));
     }
 
     [HttpGet("{id:int}")]
-    public async Task<ActionResult<LessonDto>> GetById(int id, CancellationToken ct)
+    public async Task<ActionResult<LessonAdminDto>> GetById(int id, CancellationToken ct)
     {
         var lesson = await _db.Lessons.Include(l => l.Course).FirstOrDefaultAsync(l => l.Id == id, ct);
         if (lesson == null) return NotFound();
-        return Ok(new LessonDto(lesson.Id, lesson.CourseId, lesson.Chapter, lesson.Title, lesson.Description, lesson.Task, lesson.InitialCode, lesson.ExpectedOutput, lesson.Xp, lesson.IsBoss, lesson.HasDebugger, lesson.Hint, lesson.Hint2));
+        return Ok(lesson.ToAdminDto());
     }
 
     [HttpPost]
-    public async Task<ActionResult<LessonDto>> Create([FromBody] CreateLessonRequest request, CancellationToken ct)
+    public async Task<ActionResult<LessonAdminDto>> Create([FromBody] CreateLessonRequest request, CancellationToken ct)
     {
         var courseExists = await _db.Courses.AnyAsync(c => c.Id == request.CourseId, ct);
         if (!courseExists) return BadRequest(new { message = "Course not found." });
@@ -64,11 +63,11 @@ public class AdminLessonsController : ControllerBase
         };
         _db.Lessons.Add(lesson);
         await _db.SaveChangesAsync(ct);
-        return CreatedAtAction(nameof(GetById), new { id = lesson.Id }, new LessonDto(lesson.Id, lesson.CourseId, lesson.Chapter, lesson.Title, lesson.Description, lesson.Task, lesson.InitialCode, lesson.ExpectedOutput, lesson.Xp, lesson.IsBoss, lesson.HasDebugger, lesson.Hint, lesson.Hint2));
+        return CreatedAtAction(nameof(GetById), new { id = lesson.Id }, lesson.ToAdminDto());
     }
 
     [HttpPut("{id:int}")]
-    public async Task<ActionResult<LessonDto>> Update(int id, [FromBody] UpdateLessonRequest request, CancellationToken ct)
+    public async Task<ActionResult<LessonAdminDto>> Update(int id, [FromBody] UpdateLessonRequest request, CancellationToken ct)
     {
         var lesson = await _db.Lessons.FindAsync(new object[] { id }, ct);
         if (lesson == null) return NotFound();
@@ -85,7 +84,7 @@ public class AdminLessonsController : ControllerBase
         if (request.Hint != null) lesson.Hint = request.Hint;
         if (request.Hint2 != null) lesson.Hint2 = request.Hint2;
         await _db.SaveChangesAsync(ct);
-        return Ok(new LessonDto(lesson.Id, lesson.CourseId, lesson.Chapter, lesson.Title, lesson.Description, lesson.Task, lesson.InitialCode, lesson.ExpectedOutput, lesson.Xp, lesson.IsBoss, lesson.HasDebugger, lesson.Hint, lesson.Hint2));
+        return Ok(lesson.ToAdminDto());
     }
 
     [HttpDelete("{id:int}")]

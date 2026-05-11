@@ -21,41 +21,32 @@ const HomePage = () => {
   useEffect(() => {
     const timer = setTimeout(() => setShowContent(true), 500);
 
-    // Load data from backend
     const loadData = async () => {
       try {
-        // Load user profile for XP
         const user = await usersApi.getMe();
         setUserXP(user.totalXp);
-        // Cache to localStorage
         localStorage.setItem('userXP', String(user.totalXp));
         localStorage.setItem('user', JSON.stringify(user));
       } catch {
-        // Fallback to localStorage
         setUserXP(Number(localStorage.getItem('userXP')) || 0);
       }
 
       try {
-        // Load progress for completed lessons count
         const progress: UserProgressSummary = await progressApi.getMyProgress();
         setCompletedCount(progress.completedLessonsCount);
-        // Cache
         localStorage.setItem('completedLessons', JSON.stringify(progress.completedLessonIds));
       } catch {
         setCompletedCount(JSON.parse(localStorage.getItem('completedLessons') || '[]').length);
       }
 
       try {
-        // Load achievements count
         const myAchievements = await achievementsApi.getMyAchievements();
         setAchievementsCount(myAchievements.length);
-        // Cache
         localStorage.setItem('unlockedAchievements', JSON.stringify(myAchievements.map(a => a.achievementId)));
       } catch {
         setAchievementsCount(JSON.parse(localStorage.getItem('unlockedAchievements') || '[]').length);
       }
 
-      // Themes count stays local (shop owned items are visual themes stored locally too)
       setThemesCount(JSON.parse(localStorage.getItem('ownedThemes') || '["classic"]').length);
     };
 

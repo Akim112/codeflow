@@ -10,7 +10,6 @@ export interface Notification {
 }
 
 export const notificationsApi = {
-    /** Get current user's notifications */
     getNotifications: async (unreadOnly: boolean = false, limit: number = 50): Promise<Notification[]> => {
         const params = new URLSearchParams();
         if (unreadOnly) params.set('unreadOnly', 'true');
@@ -19,12 +18,10 @@ export const notificationsApi = {
         return await api.get(`/api/notifications${query ? '?' + query : ''}`);
     },
 
-    /** Mark a single notification as read */
     markRead: async (id: string): Promise<void> => {
         await api.patch(`/api/notifications/${id}/read`);
     },
 
-    /** Mark all notifications as read */
     markAllRead: async (): Promise<void> => {
         await api.post('/api/notifications/read-all');
     },

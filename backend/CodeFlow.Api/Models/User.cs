@@ -23,4 +23,5 @@ public class User
     public ICollection<UserShopItem> OwnedShopItems { get; set; } = new List<UserShopItem>();
     public ICollection<UserNotification> Notifications { get; set; } = new List<UserNotification>();
     public ICollection<SubmissionJob> SubmissionJobs { get; set; } = new List<SubmissionJob>();
+    public ICollection<UserMoralChoice> MoralChoices { get; set; } = new List<UserMoralChoice>();
 }

@@ -1,16 +1,13 @@
-const BASE = '';  // Vite proxy handles /api -> backend
+const BASE = '';
 
 async function handleResponse(res: Response) {
     if (res.status === 401) {
-        // Only auto-redirect if user HAD a token (session expired)
-        // Don't redirect on login/register attempts — let the page handle the error
         const hadToken = !!localStorage.getItem('token');
         if (hadToken) {
             localStorage.removeItem('token');
             localStorage.removeItem('user');
             window.location.href = '/auth';
         }
-        // Parse error message from backend
         let msg = 'Unauthorized';
         try {
             const body = await res.json();
@@ -18,7 +15,7 @@ async function handleResponse(res: Response) {
         } catch { /* ignore */ }
         throw new Error(msg);
     }
-    if (res.status === 204) return null; // No Content
+    if (res.status === 204) return null;
     if (!res.ok) {
         let msg = `HTTP ${res.status}`;
         try {
@@ -27,7 +24,6 @@ async function handleResponse(res: Response) {
         } catch { /* ignore */ }
         throw new Error(msg);
     }
-    // Check if response has content
     const text = await res.text();
     if (!text) return null;
     return JSON.parse(text);
@@ -78,7 +74,6 @@ const api = {
         return handleResponse(res);
     },
 
-    /** Download a file (for CSV/PDF exports) */
     download: async (endpoint: string, filename: string) => {
         const res = await fetch(`${BASE}${endpoint}`, {
             headers: getHeaders(),

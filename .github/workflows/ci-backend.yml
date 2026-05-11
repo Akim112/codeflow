@@ -22,6 +22,6 @@ jobs:
         run: dotnet restore
         working-directory: backend
 
-      - name: Build
-        run: dotnet build --no-restore -c Release
+      - name: Build and test
+        run: dotnet test -c Release
         working-directory: backend

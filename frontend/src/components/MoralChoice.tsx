@@ -1,6 +1,6 @@
-import { Modal, Button, Title, Text, Stack, Box, Badge } from '@mantine/core';
-import { addReputation } from '../data/reputationSystem';
+import { Modal, Button, Title, Text, Stack, Box } from '@mantine/core';
 import { recordMoralChoice, chapterChoices, getChoiceIntro, getPreviousConsequence, ChapterChoice } from '../data/storyOutcomes';
+import { progressApi } from '../api/progress';
 import { sounds } from '../utils/audio';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -12,18 +12,19 @@ interface Props {
 }
 
 export const MoralChoice = ({ opened, onClose, chapter, lessonId }: Props) => {
-  const handleChoice = (choice: ChapterChoice) => {
-    addReputation(choice.faction, 50);
-    recordMoralChoice(lessonId, chapter, choice.faction);
-
-    const currentXP = Number(localStorage.getItem('userXP') || '0');
-    localStorage.setItem('userXP', String(currentXP + choice.xp));
-
-    sounds.success();
-    onClose();
+  const handleChoice = async (choice: ChapterChoice) => {
+    try {
+      const result = await progressApi.moralChoice(choice.faction, lessonId);
+      localStorage.setItem('userXP', String(result.totalXp));
+      recordMoralChoice(lessonId, chapter, choice.faction);
+      sounds.success();
+      onClose();
+    } catch {
+      sounds.error();
+      alert('Не удалось сохранить выбор. Попробуйте снова.');
+    }
   };
 
-  // Получаем выборы для текущей главы (или дефолтные)
   const choices = chapterChoices[chapter] || chapterChoices["Глава 1: Проникновение"];
   const intro = getChoiceIntro(chapter);
   const previousConsequence = getPreviousConsequence(lessonId);
@@ -44,7 +45,6 @@ export const MoralChoice = ({ opened, onClose, chapter, lessonId }: Props) => {
         }
       }}
     >
-      {/* Сканлайн эффект */}
       <Box
         style={{
           position: 'absolute',
@@ -71,7 +71,6 @@ export const MoralChoice = ({ opened, onClose, chapter, lessonId }: Props) => {
           {chapter}
         </Text>
 
-        {/* Показать последствие предыдущего выбора */}
         <AnimatePresence>
           {previousConsequence && (
             <motion.div
@@ -121,7 +120,7 @@ export const MoralChoice = ({ opened, onClose, chapter, lessonId }: Props) => {
                 color={choice.color}
                 size="lg"
                 fullWidth
-                onClick={() => handleChoice(choice)}
+                onClick={() => handleChoice(choice).catch(() => undefined)}
                 styles={{
                   root: {
                     height: 'auto',
@@ -142,7 +141,6 @@ export const MoralChoice = ({ opened, onClose, chapter, lessonId }: Props) => {
         </Stack>
       </motion.div>
 
-      {/* CSS анимации */}
       <style>{`
         @keyframes pulse-border {
           0%, 100% { box-shadow: 0 0 20px rgba(255,65,54,0.3); }

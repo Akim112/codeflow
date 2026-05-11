@@ -15,6 +15,7 @@ import { Typewriter } from 'react-simple-typewriter';
 
 import { coursesApi } from '../api/courses';
 import { progressApi } from '../api/progress';
+import { submissionsApi } from '../api/submissions';
 
 import { achievements, calculateStats } from '../data/achievements';
 import { createGlitchState, glitchAvatars } from '../data/glitchCharacter';
@@ -23,7 +24,6 @@ import { InteractiveTheory } from '../components/InteractiveTheory';
 import { HackerConsole } from '../components/HackerConsole';
 import { MoralChoice } from '../components/MoralChoice';
 import { StoryOutcome } from '../components/StoryOutcome';
-import { awardMissionReputation, getXPMultiplier } from '../data/reputationSystem';
 import { getBossTimeLimit, getBossAttemptData, recordBossFailure, canAttemptBoss, getCooldownRemaining, getCooldownTotal, resetBossOnSuccess, getMaxAttempts, formatCooldown } from '../data/bossSystem';
 import { music } from '../utils/adaptiveMusic';
 import { sounds } from '../utils/audio';
@@ -46,7 +46,7 @@ const LessonPage = () => {
   const [currentLesson, setCurrentLesson] = useState<any>(null);
   const [pageLoading, setPageLoading] = useState(true);
 
-  // --- СОСТОЯНИЯ ---
+  // СОСТОЯНИЯ
   const [code, setCode] = useState("");
   const [output, setOutput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -61,6 +61,7 @@ const LessonPage = () => {
   const [storyOutcomeOpened, setStoryOutcomeOpened] = useState(false);
   const [timeLeft, setTimeLeft] = useState<number | null>(null);
   const [unlockedHints, setUnlockedHints] = useState<number>(0);
+  const [purchasedHintTexts, setPurchasedHintTexts] = useState<string[]>([]);
   const [cleanStreak, setCleanStreak] = useState(0);
   const [typingProgress, setTypingProgress] = useState(0);
   const [traceData, setTraceData] = useState<any[] | null>(null);
@@ -108,8 +109,7 @@ const LessonPage = () => {
     fetchLesson();
   }, [lessonId]);
 
-  // --- ИНИЦИАЛИЗАЦИЯ WORKER ---
-  // --- ИНИЦИАЛИЗАЦИЯ WORKER ---
+  // ИНИЦИАЛИЗАЦИЯ WORKER
   const initWorker = useCallback(() => {
     if (workerRef.current) {
       workerRef.current.terminate();
@@ -140,15 +140,12 @@ const LessonPage = () => {
           pendingRequests.current.delete(id);
         } else {
           console.error('Pyodide Worker Fatal Error:', error);
-          // Only set error if not already ready, or if it's a critical failure
           setPyodideError(error || 'Ошибка инициализации Python ядра');
         }
       } else if (type === 'OUTPUT') {
         if (id && pendingRequests.current.has(id)) {
           const req = pendingRequests.current.get(id)!;
-          // Store raw output
           req.output += output + "\n";
-          // Start realtime update
           setOutput(prev => prev + output + "\n");
         }
       } else if (type === 'WithResult') {
@@ -158,10 +155,8 @@ const LessonPage = () => {
           pendingRequests.current.delete(id);
         }
       } else if (type === 'DEBUG_TRACE') {
-        // Handle debug trace (future implementation)
         if (id && pendingRequests.current.has(id)) {
           const req = pendingRequests.current.get(id)!;
-          // We resolve with the trace object for the debugger
           req.resolve({ output: req.output, trace });
           pendingRequests.current.delete(id);
         }
@@ -173,7 +168,7 @@ const LessonPage = () => {
 
     // Таймаут на случай если воркер зависнет
     const timeoutId = setTimeout(() => {
-      if (!isPyodideReady && !workerRef.current) { // Check if we haven't already retried or succeeded
+      if (!isPyodideReady && !workerRef.current) {
         setPyodideError('Превышено время ожидания загрузки ядра. Нажмите "Переподключить".');
       }
     }, 45000);
@@ -195,7 +190,7 @@ const LessonPage = () => {
     initWorker();
   };
 
-  // --- ИНИЦИАЛИЗАЦИЯ УРОКА ---
+  // ИНИЦИАЛИЗАЦИЯ УРОКА
   useEffect(() => {
     if (currentLesson) {
       setCode(currentLesson.initialCode);
@@ -203,6 +198,7 @@ const LessonPage = () => {
       setIsError(false);
       setErrorCount(0);
       setUnlockedHints(0);
+      setPurchasedHintTexts([]);
       setActiveTab('output');
       setTypingProgress(0);
 
@@ -252,7 +248,7 @@ const LessonPage = () => {
     }
   }, [lessonId, isBossMode, currentLesson]);
 
-  // --- ТАЙМЕР ---
+  // ТАЙМЕР
   useEffect(() => {
     if (timeLeft === 0 && !notification.type && isBossMode) {
       sounds.error();
@@ -298,7 +294,7 @@ const LessonPage = () => {
     }
   }, [timeLeft, notification.type, isBossMode, lessonId]);
 
-  // --- КУЛДАУН ТАЙМЕР ---
+  // КУЛДАУН ТАЙМЕР
   useEffect(() => {
     if (cooldownLeft > 0) {
       const timer = setTimeout(() => {
@@ -318,22 +314,23 @@ const LessonPage = () => {
     }
   }, [cooldownLeft, lessonId, bossAttempt]);
 
-  // --- АНИМАЦИЯ ПРОГРЕССА НАБОРА ---
+  // АНИМАЦИЯ ПРОГРЕССА НАБОРА
   useEffect(() => {
     if (currentLesson) {
-      const progress = (code.length / Math.max(currentLesson.expectedOutput.length * 3, 50)) * 100;
+      const progress = (code.length / Math.max(currentLesson.task.length * 3, 50)) * 100;
       setTypingProgress(Math.min(progress, 100));
     }
   }, [code, currentLesson]);
 
-  // --- ПОКУПКА ПОДСКАЗОК ---
+  // ПОКУПКА ПОДСКАЗОК
   const buyHint = useCallback(async () => {
-    const price = unlockedHints === 0 ? 50 : 150;
+    if (!currentLesson) return;
+    const hintLevel = (unlockedHints === 0 ? 1 : 2) as 1 | 2;
 
     try {
-      const result = await progressApi.purchaseHint(price);
-      // Update cached XP from server response
+      const result = await progressApi.purchaseHint(lessonId, hintLevel);
       localStorage.setItem('userXP', String(result.totalXp));
+      setPurchasedHintTexts(prev => [...prev, result.hintText]);
       setUnlockedHints(prev => prev + 1);
       sounds.success();
       setGlitchState(createGlitchState({ type: 'hint' }));
@@ -341,9 +338,9 @@ const LessonPage = () => {
       sounds.error();
       alert(err.message || "НЕДОСТАТОЧНО XP!");
     }
-  }, [unlockedHints]);
+  }, [unlockedHints, lessonId, currentLesson]);
 
-  // --- ОБРАБОТКА ОШИБОК ---
+  // ОБРАБОТКА ОШИБОК
   const handleError = useCallback((message: string) => {
     sounds.error();
     setIsError(true);
@@ -393,15 +390,13 @@ const LessonPage = () => {
     setNotification({ type: 'fail', message: 'ВЗЛОМ ПРЕРВАН!' });
     music.start('ambient');
 
-    // GSAP Shake & Red Flash Effect
     const isBoss = currentLesson?.isBoss;
     const shakeIntensity = isBoss ? 30 : 10;
     const shakeDuration = 0.05;
-    const repeat = 40; // ~2 seconds total duration (40 * 0.05s)
+    const repeat = 40;
     const redOpacity = isBoss ? 0.8 : 0.4;
     const flashDuration = 2.0;
 
-    // Intense chaotic shake
     gsap.fromTo(document.body,
       { x: 0, y: 0, rotation: 0 },
       {
@@ -418,7 +413,6 @@ const LessonPage = () => {
       }
     );
 
-    // Red Screen Flash
     if (redFlashRef.current) {
       gsap.fromTo(redFlashRef.current,
         { opacity: redOpacity },
@@ -427,51 +421,35 @@ const LessonPage = () => {
     }
   }, [currentLesson, errorCount, createGlitchState]);
 
-  // --- ЗАПУСК КОДА ---
+  // ЗАПУСК КОДА
   const handleRunCode = useCallback(async () => {
-    if (isRunningRef.current || timeLeft === 0 || !currentLesson || !isPyodideReady || !workerRef.current) return;
+    if (isRunningRef.current || timeLeft === 0 || !currentLesson) return;
     isRunningRef.current = true;
 
     sounds.click();
     music.start('coding');
     setIsLoading(true);
     setIsError(false);
-    setOutput(`> ИНИЦИАЛИЗАЦИЯ ВЗЛОМА...\n> АНАЛИЗ ЗАЩИТЫ...\n`);
+    setOutput(`> ИНИЦИАЛИЗАЦИЯ ВЗЛОМА...\n> ОТПРАВКА КОДА НА СЕРВЕР...\n`);
     setNotification({ type: null, message: '' });
 
-    await new Promise(res => setTimeout(res, 800));
-
     try {
-      const resultOutput = await new Promise<string>((resolve, reject) => {
-        const id = Date.now().toString() + Math.random().toString();
-        pendingRequests.current.set(id, { resolve, reject, output: "" });
+      const submitResult = await submissionsApi.submitCode(lessonId, code, errorCount === 0);
+      const resultOutput = submitResult.output || '';
+      setOutput(resultOutput || '> Выполнение завершено без вывода\n');
 
-        workerRef.current?.postMessage({
-          type: 'RUN_CODE',
-          code,
-          id
-        });
-      });
-
-      if (resultOutput.trim() === currentLesson.expectedOutput) {
-        // --- Отправляем результат на бэкенд ---
-        let earnedXp = currentLesson.xp;
-        try {
-          const progressResult = await progressApi.completeLesson(lessonId, errorCount === 0);
-          earnedXp = progressResult.xpEarned;
-          console.log("Прогресс сохранен в БД, XP:", earnedXp);
-          // Update cached XP
-          const cachedCompleted: number[] = JSON.parse(localStorage.getItem('completedLessons') || '[]');
-          if (!cachedCompleted.includes(lessonId)) {
-            cachedCompleted.push(lessonId);
-            localStorage.setItem('completedLessons', JSON.stringify(cachedCompleted));
-          }
-        } catch (dbErr) {
-          console.error("Не удалось сохранить прогресс в БД:", dbErr);
-          earnedXp = Math.floor(currentLesson.xp * getXPMultiplier());
+      if (submitResult.passed) {
+        const earnedXp = submitResult.xpEarned ?? currentLesson.xp;
+        if (submitResult.totalXp != null) {
+          localStorage.setItem('userXP', String(submitResult.totalXp));
         }
 
-        // Визуальные эффекты
+        const cachedCompleted: number[] = JSON.parse(localStorage.getItem('completedLessons') || '[]');
+        if (!cachedCompleted.includes(lessonId)) {
+          cachedCompleted.push(lessonId);
+          localStorage.setItem('completedLessons', JSON.stringify(cachedCompleted));
+        }
+
         music.start('victory');
         sounds.success();
         setGlitchState(createGlitchState({ type: 'success', isSuccess: true }));
@@ -490,8 +468,13 @@ const LessonPage = () => {
 
         setErrorCount(0);
       } else {
-        // НЕВЕРНЫЙ ОТВЕТ
-        handleError(`> ОШИБКА: Неверный результат.\n> ОЖИДАЛОСЬ: ${currentLesson.expectedOutput}\n> ПОЛУЧЕНО: ${resultOutput.trim()}`);
+        if (submitResult.failureReason || submitResult.error) {
+          const reason = [submitResult.failureReason, submitResult.error].filter(Boolean).join('\n');
+          handleError(`> СИСТЕМНЫЙ СБОЙ:\n${reason}`);
+        } else {
+          const expected = submitResult.expected ?? '(скрыто)';
+          handleError(`> ОШИБКА: Неверный результат.\n> ОЖИДАЛОСЬ: ${expected}\n> ПОЛУЧЕНО: ${resultOutput.trim()}`);
+        }
       }
     } catch (err: any) {
       handleError(`> СИСТЕМНЫЙ СБОЙ:\n${err.message}`);
@@ -499,16 +482,14 @@ const LessonPage = () => {
       setIsLoading(false);
       isRunningRef.current = false;
     }
-  }, [code, currentLesson, timeLeft, isPyodideReady, errorCount, cleanStreak, lessonId, isBossMode]);
+  }, [code, currentLesson, timeLeft, errorCount, lessonId, isBossMode, handleError]);
 
-  // --- DEBUGGER ---
   const handleDebug = useCallback(async () => {
     if (timeLeft === 0 || !currentLesson || !isPyodideReady || !workerRef.current) return;
 
     sounds.click();
     setIsLoading(true);
     setIsError(false);
-    // Don't clear output, we will show debug overlay
 
     try {
       const { trace } = await new Promise<{ trace: any[], output: string }>((resolve, reject) => {
@@ -822,7 +803,7 @@ const LessonPage = () => {
                         {unlockedHints === 1 ? "💡 ПОДСКАЗКА:" : "📝 РЕШЕНИЕ:"}
                       </Text>
                       <Text size="sm" c="yellow.3" style={{ whiteSpace: 'pre-wrap' }}>
-                        {unlockedHints === 1 ? currentLesson.hint : currentLesson.hint2}
+                        {purchasedHintTexts[unlockedHints - 1] ?? ''}
                       </Text>
                     </Paper>
                   </motion.div>
@@ -929,7 +910,8 @@ const LessonPage = () => {
                     fullWidth
                     size="lg"
                     color={pyodideError ? 'red' : themeColor}
-                    disabled={timeLeft === 0 || !isPyodideReady || !!pyodideError || notification.type === 'success' || cooldownLeft > 0}
+                    loading={isLoading}
+                    disabled={timeLeft === 0 || notification.type === 'success' || cooldownLeft > 0}
                     leftSection={<IconPlayerPlay size={20} />}
                     onClick={handleRunCode}
                     styles={{
@@ -939,7 +921,7 @@ const LessonPage = () => {
                       }
                     }}
                   >
-                    {pyodideError ? "⚠️ Python unavailable" : isBossMode ? "⚡ HACK CORE" : "▶ EXECUTE HACK"}
+                    {isBossMode ? "⚡ HACK CORE" : "▶ EXECUTE HACK"}
                   </Button>
 
                   <Button

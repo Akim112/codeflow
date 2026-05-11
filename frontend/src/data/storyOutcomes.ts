@@ -1,6 +1,5 @@
 // Система последствий моральных выборов и сюжетных концовок
 
-// --- Интерфейс записи выбора ---
 export interface MoralChoiceRecord {
   lessonId: number;
   chapter: string;
@@ -8,7 +7,6 @@ export interface MoralChoiceRecord {
   timestamp: number;
 }
 
-// --- Сохранить моральный выбор ---
 export const recordMoralChoice = (lessonId: number, chapter: string, faction: string) => {
   const key = 'moral_choices';
   const saved = localStorage.getItem(key);
@@ -25,13 +23,11 @@ export const recordMoralChoice = (lessonId: number, chapter: string, faction: st
   localStorage.setItem(key, JSON.stringify(choices));
 };
 
-// --- Получить все моральные выборы ---
 export const getMoralChoices = (): MoralChoiceRecord[] => {
   const saved = localStorage.getItem('moral_choices');
   return saved ? JSON.parse(saved) : [];
 };
 
-// --- Определить доминирующую фракцию ---
 export const getDominantFaction = (): string | null => {
   const choices = getMoralChoices();
   if (choices.length === 0) return null;
@@ -54,7 +50,6 @@ export const getDominantFaction = (): string | null => {
   return maxFaction;
 };
 
-// --- Уникальные описания выборов для каждой главы ---
 export interface ChapterChoice {
   faction: string;
   xp: number;
@@ -233,7 +228,6 @@ export const chapterChoices: Record<string, ChapterChoice[]> = {
   ],
 };
 
-// --- Промежуточные последствия после каждого босса ---
 export const getConsequenceText = (lessonId: number): string | null => {
   const choices = getMoralChoices();
   const choice = choices.find(c => c.lessonId === lessonId);
@@ -246,7 +240,6 @@ export const getConsequenceText = (lessonId: number): string | null => {
   return selected?.consequence || null;
 };
 
-// --- Получить последствие предыдущего босса ---
 export const getPreviousConsequence = (currentLessonId: number): string | null => {
   const bossIds = [4, 7, 10, 13, 15];
   const currentIndex = bossIds.indexOf(currentLessonId);
@@ -256,7 +249,6 @@ export const getPreviousConsequence = (currentLessonId: number): string | null =
   return getConsequenceText(previousBossId);
 };
 
-// --- Финальные концовки ---
 export interface StoryEnding {
   title: string;
   icon: string;
@@ -355,7 +347,6 @@ export const getStoryEnding = (): StoryEnding => {
   }
 };
 
-// --- Описание выбора для модального окна ---
 export const getChoiceIntro = (chapter: string): { title: string; description: string } => {
   switch (chapter) {
     case "Глава 1: Проникновение":

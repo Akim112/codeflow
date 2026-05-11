@@ -186,9 +186,7 @@ ${nextRank ? `До ${nextRank.name}: ${nextRank.min - currentXP} XP` : 'Макс
           sounds.success();
           response = `[■■■■■■■■■■] 100%
 ВЗЛОМ УСПЕШЕН! ...шутка. Это всего лишь терминал.
-Но +10 XP за находчивость!`;
-          const hackXP = Number(localStorage.getItem('userXP') || '0') + 10;
-          localStorage.setItem('userXP', String(hackXP));
+XP начисляется только за прохождение миссий на сервере.`;
           type = 'success';
           break;
 

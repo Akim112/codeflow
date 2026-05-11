@@ -8,7 +8,6 @@ export interface LeaderboardEntry {
 }
 
 export const leaderboardApi = {
-    /** Get leaderboard, optionally limited */
     getLeaderboard: async (limit: number = 50): Promise<LeaderboardEntry[]> => {
         return await api.get(`/api/leaderboard?limit=${limit}`);
     },

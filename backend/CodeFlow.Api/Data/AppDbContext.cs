@@ -19,6 +19,7 @@ public class AppDbContext : DbContext
     public DbSet<UserShopItem> UserShopItems => Set<UserShopItem>();
     public DbSet<UserNotification> UserNotifications => Set<UserNotification>();
     public DbSet<SubmissionJob> SubmissionJobs => Set<SubmissionJob>();
+    public DbSet<UserMoralChoice> UserMoralChoices => Set<UserMoralChoice>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -79,6 +80,13 @@ public class AppDbContext : DbContext
             e.HasKey(x => x.Id);
             e.HasIndex(x => new { x.UserId, x.CreatedAtUtc });
             e.HasOne(x => x.User).WithMany(u => u.SubmissionJobs).HasForeignKey(x => x.UserId);
+            e.HasOne(x => x.Lesson).WithMany().HasForeignKey(x => x.LessonId);
+        });
+
+        modelBuilder.Entity<UserMoralChoice>(e =>
+        {
+            e.HasKey(x => new { x.UserId, x.LessonId });
+            e.HasOne(x => x.User).WithMany(u => u.MoralChoices).HasForeignKey(x => x.UserId);
             e.HasOne(x => x.Lesson).WithMany().HasForeignKey(x => x.LessonId);
         });
     }

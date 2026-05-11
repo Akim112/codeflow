@@ -16,34 +16,41 @@ public class LessonsController : ControllerBase
     private readonly AppDbContext _db;
     private readonly IPythonSandboxService _sandbox;
     private readonly ISubmissionQueue _queue;
+    private readonly IProgressService _progress;
 
-    public LessonsController(AppDbContext db, IPythonSandboxService sandbox, ISubmissionQueue queue)
+    public LessonsController(
+        AppDbContext db,
+        IPythonSandboxService sandbox,
+        ISubmissionQueue queue,
+        IProgressService progress)
     {
         _db = db;
         _sandbox = sandbox;
         _queue = queue;
+        _progress = progress;
     }
 
     private Guid? UserId => Guid.TryParse(User.FindFirstValue(ClaimTypes.NameIdentifier), out var id) ? id : null;
 
     [HttpGet("{id:int}")]
-    public async Task<ActionResult<LessonDto>> GetById(int id, CancellationToken ct)
+    [Authorize]
+    public async Task<ActionResult<LessonClientDto>> GetById(int id, CancellationToken ct)
     {
-        var lesson = await _db.Lessons
-            .Include(l => l.Course)
-            .FirstOrDefaultAsync(l => l.Id == id, ct);
+        var lesson = await _db.Lessons.FirstOrDefaultAsync(l => l.Id == id, ct);
         if (lesson == null) return NotFound();
-        return Ok(new LessonDto(
-            lesson.Id, lesson.CourseId, lesson.Chapter, lesson.Title, lesson.Description,
-            lesson.Task, lesson.InitialCode, lesson.ExpectedOutput, lesson.Xp,
-            lesson.IsBoss, lesson.HasDebugger, lesson.Hint, lesson.Hint2
-        ));
+        return Ok(lesson.ToClientDto());
     }
 
+    /// <summary>
+    /// Запуск кода в песочнице и проверка результата; при успехе прогресс начисляется на сервере.
+    /// </summary>
     [HttpPost("{id:int}/submit")]
     [Authorize]
     public async Task<ActionResult<SubmitResultDto>> Submit(int id, [FromBody] SubmitCodeRequest request, CancellationToken ct)
     {
+        var userId = UserId;
+        if (userId == null) return Unauthorized();
+
         var lesson = await _db.Lessons.FindAsync(new object[] { id }, ct);
         if (lesson == null) return NotFound();
 
@@ -52,16 +59,39 @@ public class LessonsController : ControllerBase
         var expected = NormalizeOutput(lesson.ExpectedOutput);
         var passed = result.Success && output == expected;
 
+        int? xpEarned = null;
+        int? totalXp = null;
+        var lessonCompleted = false;
+
+        if (passed)
+        {
+            var progress = await _progress.CompleteLessonAsync(
+                userId.Value,
+                new CompleteLessonRequest(id, request.WasCleanRun),
+                ct);
+
+            if (progress != null)
+            {
+                lessonCompleted = true;
+                xpEarned = progress.XpEarned;
+            }
+
+            var user = await _db.Users.AsNoTracking().FirstOrDefaultAsync(u => u.Id == userId.Value, ct);
+            totalXp = user?.TotalXp;
+        }
+
         return Ok(new SubmitResultDto(
             passed,
             result.Output,
-            lesson.ExpectedOutput,
+            passed ? null : lesson.ExpectedOutput,
             result.Error,
-            result.FailureReason
+            result.FailureReason,
+            xpEarned,
+            lessonCompleted,
+            totalXp
         ));
     }
 
-    /// <summary> Асинхронная отправка кода: создаётся задача, результат проверяется по GET /api/submissions/{jobId}. </summary>
     [HttpPost("{id:int}/submit-async")]
     [Authorize]
     public async Task<ActionResult<SubmitAsyncResponse>> SubmitAsync(int id, [FromBody] SubmitCodeRequest request, CancellationToken ct)

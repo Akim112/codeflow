@@ -19,28 +19,25 @@ export interface XpBalance {
     totalXp: number;
 }
 
+export interface PurchaseHintResponse {
+    totalXp: number;
+    hintLevel: number;
+    hintText: string;
+}
+
 export const progressApi = {
-    /** Get current user's progress summary */
     getMyProgress: async (): Promise<UserProgressSummary> => {
         return await api.get('/api/progress');
     },
 
-    /** Mark a lesson as completed */
-    completeLesson: async (lessonId: number, wasCleanRun: boolean): Promise<ProgressResult> => {
-        return await api.post('/api/progress/complete', { lessonId, wasCleanRun });
+    purchaseHint: async (lessonId: number, hintLevel: 1 | 2): Promise<PurchaseHintResponse> => {
+        return await api.post('/api/progress/purchase-hint', { lessonId, hintLevel });
     },
 
-    /** Purchase a hint (costs XP) */
-    purchaseHint: async (price: number): Promise<XpBalance> => {
-        return await api.post('/api/progress/purchase-hint', { price });
+    moralChoice: async (factionId: string, lessonId: number): Promise<XpBalance> => {
+        return await api.post('/api/progress/moral-choice', { factionId, lessonId });
     },
 
-    /** Submit a moral choice */
-    moralChoice: async (factionId: string, xpBonus: number, reputationBonus: number): Promise<XpBalance> => {
-        return await api.post('/api/progress/moral-choice', { factionId, xpBonus, reputationBonus });
-    },
-
-    /** Reset all progress */
     resetProgress: async (): Promise<void> => {
         await api.post('/api/progress/reset');
     },

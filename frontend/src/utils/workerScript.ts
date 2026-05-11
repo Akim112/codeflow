@@ -7,7 +7,7 @@ async function loadPyodide() {
   try {
     ctx.postMessage({ type: 'LOG', message: 'Worker started loading Pyodide' });
     
-    // Fallback CDNs - Trying multiple reliable sources
+    // Резервные CDN для загрузки Pyodide
     const cdns = [
       'https://cdn.jsdelivr.net/pyodide/v0.24.1/full/pyodide.js',
       'https://unpkg.com/pyodide@0.24.1/pyodide.js',

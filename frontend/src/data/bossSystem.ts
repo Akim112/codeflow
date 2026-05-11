@@ -28,19 +28,16 @@ const COOLDOWNS: Record<number, number> = {
 
 const FINAL_COOLDOWN = 28800; // 8 часов после 5 неудач
 
-// --- Интерфейсы ---
 export interface BossAttemptData {
   attempt: number;       // Текущая попытка (1-5)
   failedAt: number;      // Timestamp последнего провала
   completed: boolean;    // Пройден ли босс
 }
 
-// --- Получить лимит времени для босса ---
 export const getBossTimeLimit = (lessonId: number): number => {
   return BOSS_TIME_LIMITS[lessonId] || 80;
 };
 
-// --- Получить данные о попытках босса ---
 export const getBossAttemptData = (lessonId: number): BossAttemptData => {
   const key = `boss_attempt_${lessonId}`;
   const saved = localStorage.getItem(key);
@@ -50,13 +47,11 @@ export const getBossAttemptData = (lessonId: number): BossAttemptData => {
   return { attempt: 1, failedAt: 0, completed: false };
 };
 
-// --- Сохранить данные о попытках ---
 const saveBossAttemptData = (lessonId: number, data: BossAttemptData) => {
   const key = `boss_attempt_${lessonId}`;
   localStorage.setItem(key, JSON.stringify(data));
 };
 
-// --- Записать провал босса ---
 export const recordBossFailure = (lessonId: number): {
   nextAttempt: number;
   cooldownSeconds: number;
@@ -95,7 +90,6 @@ export const recordBossFailure = (lessonId: number): {
   };
 };
 
-// --- Проверить, можно ли начать попытку ---
 export const canAttemptBoss = (lessonId: number): boolean => {
   const data = getBossAttemptData(lessonId);
   if (data.completed) return true; // Уже пройден
@@ -104,7 +98,6 @@ export const canAttemptBoss = (lessonId: number): boolean => {
   return remaining <= 0;
 };
 
-// --- Получить оставшееся время кулдауна (в секундах) ---
 export const getCooldownRemaining = (lessonId: number): number => {
   const data = getBossAttemptData(lessonId);
   if (data.failedAt === 0) return 0;
@@ -126,7 +119,6 @@ export const getCooldownRemaining = (lessonId: number): number => {
   return Math.ceil(cooldown - elapsed);
 };
 
-// --- Получить общую длительность текущего кулдауна (в секундах) ---
 export const getCooldownTotal = (lessonId: number): number => {
   const data = getBossAttemptData(lessonId);
   if (data.attempt === 1 && data.failedAt > 0 && !data.completed) {
@@ -135,7 +127,6 @@ export const getCooldownTotal = (lessonId: number): number => {
   return COOLDOWNS[data.attempt] || 0;
 };
 
-// --- Сбросить данные при успехе ---
 export const resetBossOnSuccess = (lessonId: number) => {
   saveBossAttemptData(lessonId, {
     attempt: 1,
@@ -144,10 +135,8 @@ export const resetBossOnSuccess = (lessonId: number) => {
   });
 };
 
-// --- Получить максимальное кол-во попыток ---
 export const getMaxAttempts = (): number => MAX_ATTEMPTS;
 
-// --- Форматировать время кулдауна для отображения ---
 export const formatCooldown = (seconds: number): string => {
   if (seconds <= 0) return '0с';
 

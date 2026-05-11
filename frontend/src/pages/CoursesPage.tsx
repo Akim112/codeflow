@@ -14,7 +14,6 @@ const CoursesPage = () => {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        // Load courses and progress in parallel
         const [coursesData, progressData] = await Promise.allSettled([
           coursesApi.getAllCourses(),
           progressApi.getMyProgress(),
@@ -23,7 +22,6 @@ const CoursesPage = () => {
         if (coursesData.status === 'fulfilled') {
           setCourses(coursesData.value);
 
-          // Load lessons for each course
           const lessonsMap: Record<number, Lesson[]> = {};
           const lessonPromises = coursesData.value
             .filter(c => c.totalLessons > 0)
@@ -41,10 +39,8 @@ const CoursesPage = () => {
 
         if (progressData.status === 'fulfilled') {
           setCompletedLessonIds(progressData.value.completedLessonIds);
-          // Cache
           localStorage.setItem('completedLessons', JSON.stringify(progressData.value.completedLessonIds));
         } else {
-          // Fallback
           setCompletedLessonIds(JSON.parse(localStorage.getItem('completedLessons') || '[]'));
         }
       } catch (error) {
@@ -81,7 +77,6 @@ const CoursesPage = () => {
           const completedCount = lessons.filter(l => completedLessonIds.includes(l.id)).length;
           const progressPercent = course.totalLessons > 0 ? (completedCount / course.totalLessons) * 100 : 0;
 
-          // Find the first uncompleted lesson to link to
           const firstUncompletedLesson = lessons.find(l => !completedLessonIds.includes(l.id));
           const firstLesson = lessons.length > 0 ? lessons[0] : null;
           const targetLesson = firstUncompletedLesson || firstLesson;

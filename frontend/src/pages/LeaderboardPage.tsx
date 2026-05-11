@@ -10,7 +10,6 @@ const LeaderboardPage = () => {
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
 
   useEffect(() => {
-    // Get current user ID from cached user data
     const user = authApi.getUser();
     if (user?.id) {
       setCurrentUserId(user.id);
