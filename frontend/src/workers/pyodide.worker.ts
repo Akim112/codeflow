@@ -1,4 +1,4 @@
- 
+/* eslint-disable no-restricted-globals */
 // Web Worker для Pyodide
 
 // Определяем типы для глобального скоупа воркера

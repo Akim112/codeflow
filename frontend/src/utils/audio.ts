@@ -1,7 +1,28 @@
 // Утилита для генерации "компьютерного" звука через код (Web Audio API)
+// Один общий AudioContext — браузер ограничивает количество (~6-8 макс.)
+let sharedAudioCtx: AudioContext | null = null;
+
+const getAudioContext = (): AudioContext | null => {
+  try {
+    if (!sharedAudioCtx) {
+      sharedAudioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
+    }
+    // Возобновляем контекст если он приостановлен (autoplay policy)
+    if (sharedAudioCtx.state === 'suspended') {
+      sharedAudioCtx.resume();
+    }
+    return sharedAudioCtx;
+  } catch (e) {
+    console.error("Audio context error:", e);
+    return null;
+  }
+};
+
 const playSynthSound = (freq: number, type: OscillatorType, duration: number) => {
   try {
-    const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
+    const audioCtx = getAudioContext();
+    if (!audioCtx) return;
+
     const oscillator = audioCtx.createOscillator();
     const gainNode = audioCtx.createGain();
 
@@ -42,7 +63,9 @@ export const sounds = {
   // Исправленная сирена
   siren: () => {
     try {
-      const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
+      const audioCtx = getAudioContext();
+      if (!audioCtx) return;
+
       const oscillator = audioCtx.createOscillator();
       const gainNode = audioCtx.createGain();
 

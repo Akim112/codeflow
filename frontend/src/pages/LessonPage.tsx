@@ -1,25 +1,33 @@
-import { useState, useEffect, useCallback, lazy, Suspense } from 'react';
+import { useState, useEffect, useCallback, useRef, lazy, Suspense } from 'react';
+import { useMediaQuery } from '@mantine/hooks';
+import { gsap } from 'gsap';
 import { useParams, useNavigate } from 'react-router-dom';
 import confetti from 'canvas-confetti';
 import {
   Button, Title, Text, Paper, Group, Badge, Notification,
-  Stack, Center, Box, Collapse, ActionIcon, Tabs, Kbd, Progress, Loader, Skeleton
+  Stack, Center, Box, Tabs, Kbd, Progress, Loader, Skeleton
 } from '@mantine/core';
 import {
-  IconBulb, IconClock, IconTerminal, IconFileCode, IconArrowRight, IconPlayerPlay
+  IconBulb, IconClock, IconTerminal, IconFileCode, IconArrowRight, IconPlayerPlay, IconBug, IconHeart, IconShieldLock
 } from '@tabler/icons-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Typewriter } from 'react-simple-typewriter';
 
+import { lessons } from '../data/lessons';
+import { achievements, calculateStats } from '../data/achievements';
 import { createGlitchState, glitchAvatars } from '../data/glitchCharacter';
-import { TimeDebugger } from '../components/TimeDebugger';
+
 import { InteractiveTheory } from '../components/InteractiveTheory';
 import { HackerConsole } from '../components/HackerConsole';
 import { MoralChoice } from '../components/MoralChoice';
+import { StoryOutcome } from '../components/StoryOutcome';
+import { awardMissionReputation, getXPMultiplier } from '../data/reputationSystem';
+import { getBossTimeLimit, getBossAttemptData, recordBossFailure, canAttemptBoss, getCooldownRemaining, getCooldownTotal, resetBossOnSuccess, getMaxAttempts, formatCooldown } from '../data/bossSystem';
 import { music } from '../utils/adaptiveMusic';
 import { sounds } from '../utils/audio';
 import { MatrixRain } from '../components/MatrixRain';
-import { api, syncServerStateToLocalStorage, type LessonDto } from '../api';
+import { pyodideWorkerScript } from '../utils/workerScript';
+import { Debugger } from '../components/Debugger';
 
 // Ленивая загрузка Monaco Editor для ускорения первоначальной загрузки страницы
 const Editor = lazy(() => import('@monaco-editor/react'));
@@ -32,86 +40,252 @@ const LessonPage = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const lessonId = Number(id);
-  const [currentLesson, setCurrentLesson] = useState<LessonDto | null>(null);
-  const [courseLessons, setCourseLessons] = useState<LessonDto[]>([]);
+  const currentLesson = lessons.find(l => l.id === lessonId);
 
   // --- СОСТОЯНИЯ ---
   const [code, setCode] = useState("");
   const [output, setOutput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [isPyodideReady, setIsPyodideReady] = useState(false);
+  const [pyodideError, setPyodideError] = useState<string | null>(null);
   const [isError, setIsError] = useState(false);
   const [errorCount, setErrorCount] = useState(0);
   const [glitchState, setGlitchState] = useState(createGlitchState({ type: 'welcome' }));
   const [notification, setNotification] = useState<{ type: 'success' | 'fail' | null, message: string }>({ type: null, message: '' });
-  const [showDebugger, setShowDebugger] = useState(false);
+  const [activeTab, setActiveTab] = useState<string | null>('output');
   const [moralModalOpened, setMoralModalOpened] = useState(false);
+  const [storyOutcomeOpened, setStoryOutcomeOpened] = useState(false);
   const [timeLeft, setTimeLeft] = useState<number | null>(null);
   const [unlockedHints, setUnlockedHints] = useState<number>(0);
   const [cleanStreak, setCleanStreak] = useState(0);
   const [typingProgress, setTypingProgress] = useState(0);
+  const [traceData, setTraceData] = useState<any[] | null>(null);
+  const [bossAttempt, setBossAttempt] = useState(1);
+  const [cooldownLeft, setCooldownLeft] = useState(0);
+  const [showBossBriefing, setShowBossBriefing] = useState(false);
+
+  // Ref для отслеживания активных запросов к воркеру
+  const pendingRequests = useRef<Map<string, { resolve: (val: any) => void, reject: (err: any) => void, output: string }>>(new Map());
+  const workerRef = useRef<Worker | null>(null);
+  const redFlashRef = useRef<HTMLDivElement>(null);
+  const isRunningRef = useRef(false); // Мьютекс для предотвращения двойного запуска
+  
+  const isMobile = useMediaQuery('(max-width: 1024px)');
 
   const isBossMode = currentLesson?.isBoss || false;
   const themeColor = isBossMode ? 'red' : 'green';
   const terminalTextColor = isBossMode ? '#FF4136' : '#00FF41';
   const borderColor = isBossMode ? '#FF4136' : '#1A1B1E';
 
+  // --- ИНИЦИАЛИЗАЦИЯ WORKER ---
+  // --- ИНИЦИАЛИЗАЦИЯ WORKER ---
+  const initWorker = useCallback(() => {
+    if (workerRef.current) {
+      workerRef.current.terminate();
+    }
+
+    setIsPyodideReady(false);
+    setPyodideError(null);
+
+    // Инициализируем воркер из Blob, что гарантирует загрузку скрипта
+    const blob = new Blob([pyodideWorkerScript], { type: 'application/javascript' });
+    const workerUrl = URL.createObjectURL(blob);
+    workerRef.current = new Worker(workerUrl);
+
+    workerRef.current.onmessage = (event) => {
+      const { type, error, id, output, message, result, trace } = event.data;
+
+      if (type === 'READY') {
+        console.log('Pyodide Worker READY');
+        setIsPyodideReady(true);
+        setPyodideError(null);
+      } else if (type === 'LOG') {
+        console.log('[Worker]', message);
+      } else if (type === 'ERROR') {
+        if (id && pendingRequests.current.has(id)) {
+          console.error('Worker request failed:', error);
+          const req = pendingRequests.current.get(id);
+          req?.reject(new Error(error));
+          pendingRequests.current.delete(id);
+        } else {
+          console.error('Pyodide Worker Fatal Error:', error);
+          // Only set error if not already ready, or if it's a critical failure
+          setPyodideError(error || 'Ошибка инициализации Python ядра');
+        }
+      } else if (type === 'OUTPUT') {
+        if (id && pendingRequests.current.has(id)) {
+          const req = pendingRequests.current.get(id)!;
+          // Store raw output
+          req.output += output + "\n";
+          // Start realtime update
+          setOutput(prev => prev + output + "\n");
+        }
+      } else if (type === 'WithResult') {
+        if (id && pendingRequests.current.has(id)) {
+          const req = pendingRequests.current.get(id)!;
+          req.resolve(req.output); // Возвращаем накопленный вывод
+          pendingRequests.current.delete(id);
+        }
+      } else if (type === 'DEBUG_TRACE') {
+        // Handle debug trace (future implementation)
+        if (id && pendingRequests.current.has(id)) {
+          const req = pendingRequests.current.get(id)!;
+          // We resolve with the trace object for the debugger
+          req.resolve({ output: req.output, trace });
+          pendingRequests.current.delete(id);
+        }
+      }
+    };
+
+    // Запускаем инициализацию в воркере
+    workerRef.current.postMessage({ type: 'INIT' });
+
+    // Таймаут на случай если воркер зависнет
+    const timeoutId = setTimeout(() => {
+      if (!isPyodideReady && !workerRef.current) { // Check if we haven't already retried or succeeded
+        setPyodideError('Превышено время ожидания загрузки ядра. Нажмите "Переподключить".');
+      }
+    }, 45000);
+
+    return () => {
+      clearTimeout(timeoutId);
+      workerRef.current?.terminate();
+      URL.revokeObjectURL(workerUrl);
+    };
+  }, []);
+
+  useEffect(() => {
+    const cleanup = initWorker();
+    return cleanup;
+  }, [initWorker]);
+
+  const handleRetryConnection = () => {
+    console.log('Retrying connection...');
+    initWorker();
+  };
+
   // --- ИНИЦИАЛИЗАЦИЯ УРОКА ---
   useEffect(() => {
-    let disposed = false;
-    const loadLesson = async () => {
-      const lesson = await api.getLessonById(lessonId);
-      if (disposed) return;
-      setCurrentLesson(lesson);
-      const list = await api.getCourseLessons(lesson.courseId).catch(() => []);
-      if (disposed) return;
-      setCourseLessons(list);
-
-      setCode(lesson.initialCode);
+    if (currentLesson) {
+      setCode(currentLesson.initialCode);
       setNotification({ type: null, message: '' });
       setIsError(false);
       setErrorCount(0);
       setUnlockedHints(0);
-      setShowDebugger(false);
+      setActiveTab('output');
       setTypingProgress(0);
 
       setCleanStreak(Number(localStorage.getItem('cleanStreak') || '0'));
 
-      if (lesson.isBoss) {
-        setTimeLeft(60);
-        document.body.setAttribute('data-boss-mode', 'true');
-        music.start('boss');
-        setOutput("⚠️ WARNING: HIGH-LEVEL ENCRYPTION DETECTED\n⚠️ SYSTEM OVERRIDE IN PROGRESS...\n");
-        sounds.siren();
-        setGlitchState(createGlitchState({ type: 'boss', isBoss: true }));
+      if (isBossMode) {
+        // Проверяем доступность босса (cooldown)
+        const canPlay = canAttemptBoss(lessonId);
+        const remaining = getCooldownRemaining(lessonId);
+        const attemptData = getBossAttemptData(lessonId);
+        
+        setBossAttempt(attemptData.attempt);
+        setCooldownLeft(remaining);
+
+        if (!canPlay && remaining > 0) {
+          // Босс на кулдауне
+          setTimeLeft(null);
+          setGlitchState(createGlitchState({ type: 'cooldown' }));
+          setOutput(`⏳ СИСТЕМА ЗАБЛОКИРОВАНА\n⏳ Следующая попытка через: ${formatCooldown(remaining)}\n\n> Перезагрузите страницу когда время выйдет.`);
+          document.body.setAttribute('data-boss-mode', 'true');
+          music.start('ambient');
+        } else {
+          // Доступен — показать брифинг и запустить
+          const timeLimit = getBossTimeLimit(lessonId);
+          setTimeLeft(timeLimit);
+          setShowBossBriefing(true);
+          document.body.setAttribute('data-boss-mode', 'true');
+          music.start('boss');
+          setOutput(`⚠️ WARNING: HIGH-LEVEL ENCRYPTION DETECTED\n⚠️ SYSTEM OVERRIDE IN PROGRESS...\n⏱️ ВРЕМЯ: ${timeLimit} секунд\n❤️ ПОПЫТКА: ${attemptData.attempt} из ${getMaxAttempts()}\n`);
+          sounds.siren();
+          setGlitchState(createGlitchState({ type: 'boss', isBoss: true }));
+        }
       } else {
         setTimeLeft(null);
+        setCooldownLeft(0);
+        setShowBossBriefing(false);
         document.body.removeAttribute('data-boss-mode');
         music.start('ambient');
         setOutput("");
         setGlitchState(createGlitchState({ type: 'welcome' }));
       }
-    };
-    loadLesson().catch(console.error);
 
-    return () => {
-      disposed = true;
-      music.stop();
-      document.body.removeAttribute('data-boss-mode');
-    };
-  }, [lessonId]);
+      return () => {
+        music.stop();
+        document.body.removeAttribute('data-boss-mode');
+      };
+    }
+  }, [lessonId, isBossMode, currentLesson]);
 
   // --- ТАЙМЕР ---
   useEffect(() => {
-    if (timeLeft === 0 && !notification.type) {
+    if (timeLeft === 0 && !notification.type && isBossMode) {
       sounds.error();
       setIsError(true);
-      setNotification({ type: 'fail', message: 'СИСТЕМА ОБНАРУЖЕНА! Время истекло.' });
+      
+      // Записываем провал и получаем информацию о следующей попытке
+      const result = recordBossFailure(lessonId);
+      
+      if (result.isLocked && result.cooldownSeconds >= 28800) {
+        // Все 5 попыток использованы
+        setNotification({
+          type: 'fail',
+          message: `СИСТЕМА ОБНАРУЖЕНА! Все попытки исчерпаны.\n⏳ Следующая серия попыток через ${formatCooldown(result.cooldownSeconds)}.`
+        });
+        setCooldownLeft(result.cooldownSeconds);
+      } else if (result.isLocked) {
+        // Есть кулдаун перед следующей попыткой
+        setNotification({
+          type: 'fail',
+          message: `ВРЕМЯ ИСТЕКЛО! Попытка ${result.nextAttempt - 1} из ${getMaxAttempts()} провалена.\n⏳ Следующая попытка через ${formatCooldown(result.cooldownSeconds)}.`
+        });
+        setCooldownLeft(result.cooldownSeconds);
+        setBossAttempt(result.nextAttempt);
+      } else {
+        // Мгновенная повторная попытка (вторая жизнь) — автоматический перезапуск таймера
+        setBossAttempt(result.nextAttempt);
+        setNotification({
+          type: 'fail',
+          message: `ВРЕМЯ ИСТЕКЛО! Попытка ${result.nextAttempt - 1} из ${getMaxAttempts()}.\n❤️ Перезапуск через 3 сек...`
+        });
+        setTimeout(() => {
+          const newTimeLimit = getBossTimeLimit(lessonId);
+          setTimeLeft(newTimeLimit);
+          setIsError(false);
+          setNotification({ type: null, message: '' });
+          setOutput(`⚠️ ПОВТОРНАЯ ПОПЫТКА\n⏱️ ВРЕМЯ: ${newTimeLimit} секунд\n❤️ ПОПЫТКА: ${result.nextAttempt} из ${getMaxAttempts()}\n`);
+        }, 3000);
+      }
     }
-    if (timeLeft && timeLeft > 0 && !notification.type) {
+    if (timeLeft && timeLeft > 0 && (notification.type !== 'success')) {
       const timer = setTimeout(() => setTimeLeft(timeLeft - 1), 1000);
       return () => clearTimeout(timer);
     }
-  }, [timeLeft, notification.type]);
+  }, [timeLeft, notification.type, isBossMode, lessonId]);
+
+  // --- КУЛДАУН ТАЙМЕР ---
+  useEffect(() => {
+    if (cooldownLeft > 0) {
+      const timer = setTimeout(() => {
+        const remaining = getCooldownRemaining(lessonId);
+        setCooldownLeft(remaining);
+        if (remaining <= 0) {
+          // Кулдаун закончился — автоматический перезапуск миссии
+          const newTimeLimit = getBossTimeLimit(lessonId);
+          setTimeLeft(newTimeLimit);
+          setIsError(false);
+          setNotification({ type: null, message: '' });
+          setOutput(`✅ СИСТЕМА РАЗБЛОКИРОВАНА!\n⏱️ ВРЕМЯ: ${newTimeLimit} секунд\n❤️ ПОПЫТКА: ${bossAttempt} из ${getMaxAttempts()}\n\n> Удачи, оператор.`);
+          sounds.success();
+        }
+      }, 1000);
+      return () => clearTimeout(timer);
+    }
+  }, [cooldownLeft, lessonId, bossAttempt]);
 
   // --- АНИМАЦИЯ ПРОГРЕССА НАБОРА ---
   useEffect(() => {
@@ -127,24 +301,104 @@ const LessonPage = () => {
     const price = unlockedHints === 0 ? 50 : 150;
 
     if (currentXP >= price) {
-      api.purchaseHint(price).then(async () => {
-        await syncServerStateToLocalStorage().catch(() => undefined);
-        setUnlockedHints(prev => prev + 1);
-        sounds.success();
-        setGlitchState(createGlitchState({ type: 'hint' }));
-      }).catch(() => {
-        sounds.error();
-        alert("НЕДОСТАТОЧНО XP!");
-      });
+      localStorage.setItem('userXP', String(currentXP - price));
+      setUnlockedHints(prev => prev + 1);
+      sounds.success();
+      setGlitchState(createGlitchState({ type: 'hint' }));
     } else {
       sounds.error();
       alert("НЕДОСТАТОЧНО XP!");
     }
   }, [unlockedHints]);
 
+  // --- ОБРАБОТКА ОШИБОК ---
+  const handleError = useCallback((message: string) => {
+    sounds.error();
+    setIsError(true);
+    setErrorCount(prev => prev + 1);
+    setCleanStreak(0);
+    localStorage.setItem('cleanStreak', '0');
+    setGlitchState(createGlitchState({ type: 'error', isError: true, errorCount: errorCount + 1 }));
+    setOutput(message);
+
+    // В боссовом режиме: уменьшить жизни и НЕ останавливать таймер
+    if (isBossMode && currentLesson?.isBoss) {
+      const result = recordBossFailure(lessonId);
+      setBossAttempt(result.nextAttempt);
+
+      if (result.isLocked && result.cooldownSeconds >= 28800) {
+        // Все жизни потрачены — полная блокировка
+        setTimeLeft(0);
+        setNotification({
+          type: 'fail',
+          message: `ВСЕ ЖИЗНИ ПОТЕРЯНЫ! \n⏳ Следующая серия попыток через ${formatCooldown(result.cooldownSeconds)}.`
+        });
+        setCooldownLeft(result.cooldownSeconds);
+        music.start('ambient');
+        return;
+      } else if (result.isLocked) {
+        // Есть кулдаун — остановить
+        setTimeLeft(0);
+        setNotification({
+          type: 'fail',
+          message: `ЖИЗНЬ ПОТЕРЯНА! [${getMaxAttempts() - result.nextAttempt + 1}/${getMaxAttempts()}]\n⏳ Следующая попытка через ${formatCooldown(result.cooldownSeconds)}.`
+        });
+        setCooldownLeft(result.cooldownSeconds);
+        music.start('ambient');
+        return;
+      }
+
+      // Мгновенная жизнь — показать предупреждение на 3 секунды, таймер НЕ останавливается
+      setNotification({ type: 'fail', message: `ОШИБКА! ЖИЗНЬ ПОТЕРЯНА [${getMaxAttempts() - result.nextAttempt + 1}/${getMaxAttempts()}]` });
+      // Автоочистка через 3 сек чтобы таймер не стоял
+      setTimeout(() => {
+        setNotification(prev => prev.type === 'fail' ? { type: null, message: '' } : prev);
+        setIsError(false);
+      }, 3000);
+      return;
+    }
+
+    setNotification({ type: 'fail', message: 'ВЗЛОМ ПРЕРВАН!' });
+    music.start('ambient');
+
+    // GSAP Shake & Red Flash Effect
+    const isBoss = currentLesson?.isBoss;
+    const shakeIntensity = isBoss ? 30 : 10;
+    const shakeDuration = 0.05;
+    const repeat = 40; // ~2 seconds total duration (40 * 0.05s)
+    const redOpacity = isBoss ? 0.8 : 0.4;
+    const flashDuration = 2.0;
+
+    // Intense chaotic shake
+    gsap.fromTo(document.body,
+      { x: 0, y: 0, rotation: 0 },
+      {
+        x: () => (Math.random() - 0.5) * shakeIntensity,
+        y: () => (Math.random() - 0.5) * shakeIntensity,
+        rotation: () => (Math.random() - 0.5) * (isBoss ? 4 : 1),
+        duration: shakeDuration,
+        repeat: repeat,
+        yoyo: true,
+        ease: "sine.inOut",
+        onComplete: () => {
+          gsap.set(document.body, { x: 0, y: 0, rotation: 0 });
+        }
+      }
+    );
+
+    // Red Screen Flash
+    if (redFlashRef.current) {
+      gsap.fromTo(redFlashRef.current,
+        { opacity: redOpacity },
+        { opacity: 0, duration: flashDuration, ease: "power2.out" }
+      );
+    }
+  }, [currentLesson, errorCount, createGlitchState]);
+
   // --- ЗАПУСК КОДА ---
   const handleRunCode = useCallback(async () => {
-    if (timeLeft === 0 || !currentLesson) return;
+    if (isRunningRef.current || timeLeft === 0 || !currentLesson || !isPyodideReady || !workerRef.current) return;
+    isRunningRef.current = true;
 
     sounds.click();
     music.start('coding');
@@ -156,11 +410,18 @@ const LessonPage = () => {
     await new Promise(res => setTimeout(res, 800));
 
     try {
-      const submitResult = await api.submitLesson(lessonId, code);
-      const resultOutput = submitResult.output || '';
-      setOutput(resultOutput || '> Выполнение завершено без вывода\n');
+      const resultOutput = await new Promise<string>((resolve, reject) => {
+        const id = Date.now().toString() + Math.random().toString();
+        pendingRequests.current.set(id, { resolve, reject, output: "" });
 
-      if (submitResult.passed) {
+        workerRef.current?.postMessage({
+          type: 'RUN_CODE',
+          code,
+          id
+        });
+      });
+
+      if (resultOutput.trim() === currentLesson.expectedOutput) {
         // УСПЕХ
         music.start('victory');
         sounds.success();
@@ -178,49 +439,111 @@ const LessonPage = () => {
         setTimeout(() => confetti({ particleCount: 100, angle: 60, spread: 55, origin: { x: 0 } }), 200);
         setTimeout(() => confetti({ particleCount: 100, angle: 120, spread: 55, origin: { x: 1 } }), 400);
 
-        const progressResult = await api.completeLesson(lessonId, errorCount === 0).catch(() => null);
-        await syncServerStateToLocalStorage().catch(() => undefined);
+        // XP с множителем
+        const finalXP = Math.floor(currentLesson.xp * getXPMultiplier());
+        localStorage.setItem('userXP', String((Number(localStorage.getItem('userXP')) || 0) + finalXP));
 
-        const progress = await api.getMyProgress().catch(() => null);
-        setCleanStreak(progress?.cleanStreak ?? 0);
+        // Репутация
+        awardMissionReputation(lessonId, errorCount === 0);
+
+        // Прогресс
+        const completedRaw = localStorage.getItem('completedLessons');
+        const completed: number[] = completedRaw ? JSON.parse(completedRaw) : [];
+        if (!completed.includes(lessonId)) {
+          completed.push(lessonId);
+          localStorage.setItem('completedLessons', JSON.stringify(completed));
+        }
+
+        // Clean streak
+        const newCleanStreak = errorCount === 0 ? cleanStreak + 1 : 0;
+        setCleanStreak(newCleanStreak);
+        localStorage.setItem('cleanStreak', String(newCleanStreak));
+
+        // Fast boss kill
+        if (isBossMode && timeLeft && timeLeft > 30) {
+          localStorage.setItem('fastBossKill', 'true');
+        }
+
+        // Сбросить данные босса при успехе
+        if (isBossMode) {
+          resetBossOnSuccess(lessonId);
+        }
+
+        // Проверка достижений
+        let achievementMessage = "";
+        const stats = calculateStats();
+        const unlockedRaw = localStorage.getItem('unlockedAchievements');
+        let unlocked: string[] = unlockedRaw ? JSON.parse(unlockedRaw) : [];
+
+        achievements.forEach(ach => {
+          if (!unlocked.includes(ach.id) && ach.condition(stats)) {
+            unlocked.push(ach.id);
+            localStorage.setItem('unlockedAchievements', JSON.stringify(unlocked));
+            achievementMessage += `\n🏆 ДОСТИЖЕНИЕ: ${ach.title}!`;
+            sounds.success();
+          }
+        });
 
         setNotification({
           type: 'success',
-          message: `ДОСТУП ПОЛУЧЕН! +${progressResult?.xpEarned ?? currentLesson.xp} XP`
+          message: `ДОСТУП ПОЛУЧЕН! +${finalXP} XP${achievementMessage}`
         });
 
         // Моральный выбор на боссах
         if (isBossMode) {
           setTimeout(() => setMoralModalOpened(true), 2000);
+          // Для финального босса — показать StoryOutcome после морального выбора
+          if (lessonId === 15) {
+            setTimeout(() => setStoryOutcomeOpened(true), 4000);
+          }
         }
 
         setErrorCount(0);
       } else {
-        if (submitResult.failureReason || submitResult.error) {
-          const reason = [submitResult.failureReason, submitResult.error].filter(Boolean).join('\n');
-          handleError(`> СИСТЕМНЫЙ СБОЙ:\n${reason}`);
-        } else {
-          handleError(`> ОШИБКА: Неверный результат.\n> ОЖИДАЛОСЬ: ${currentLesson.expectedOutput}\n> ПОЛУЧЕНО: ${resultOutput.trim()}`);
-        }
+        // НЕВЕРНЫЙ ОТВЕТ
+        handleError(`> ОШИБКА: Неверный результат.\n> ОЖИДАЛОСЬ: ${currentLesson.expectedOutput}\n> ПОЛУЧЕНО: ${resultOutput.trim()}`);
       }
     } catch (err: any) {
       handleError(`> СИСТЕМНЫЙ СБОЙ:\n${err.message}`);
     } finally {
       setIsLoading(false);
+      isRunningRef.current = false;
     }
-  }, [code, currentLesson, timeLeft, errorCount, cleanStreak, lessonId, isBossMode]);
+  }, [code, currentLesson, timeLeft, isPyodideReady, errorCount, cleanStreak, lessonId, isBossMode]);
 
-  const handleError = (message: string) => {
-    sounds.error();
-    setIsError(true);
-    setErrorCount(prev => prev + 1);
-    setCleanStreak(0);
-    localStorage.setItem('cleanStreak', '0');
-    setGlitchState(createGlitchState({ type: 'error', isError: true, errorCount: errorCount + 1 }));
-    setOutput(message);
-    setNotification({ type: 'fail', message: 'ВЗЛОМ ПРЕРВАН!' });
-    music.start('ambient');
-  };
+  // --- DEBUGGER ---
+  const handleDebug = useCallback(async () => {
+    if (timeLeft === 0 || !currentLesson || !isPyodideReady || !workerRef.current) return;
+
+    sounds.click();
+    setIsLoading(true);
+    setIsError(false);
+    // Don't clear output, we will show debug overlay
+
+    try {
+      const { trace } = await new Promise<{ trace: any[], output: string }>((resolve, reject) => {
+        const id = Date.now().toString() + Math.random().toString();
+        pendingRequests.current.set(id, { resolve, reject, output: "" });
+
+        workerRef.current?.postMessage({
+          type: 'RUN_DEBUG',
+          code,
+          id
+        });
+      });
+
+      setTraceData(trace);
+      setTraceData(trace);
+      setActiveTab('debug');
+    } catch (err: any) {
+      handleError(`> DEBUG FAILURE:\n${err.message}`);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [code, currentLesson, timeLeft, isPyodideReady, handleError]);
+
+
+
 
   // Горячие клавиши
   useEffect(() => {
@@ -249,7 +572,7 @@ const LessonPage = () => {
     );
   }
 
-  const nextLesson = courseLessons.find(l => l.id === lessonId + 1);
+  const nextLesson = lessons.find(l => l.id === lessonId + 1);
 
   return (
     <Box
@@ -270,6 +593,12 @@ const LessonPage = () => {
           opened={moralModalOpened}
           onClose={() => setMoralModalOpened(false)}
           chapter={currentLesson.chapter}
+          lessonId={lessonId}
+        />
+
+        <StoryOutcome
+          opened={storyOutcomeOpened}
+          onClose={() => setStoryOutcomeOpened(false)}
         />
 
         {/* HEADER */}
@@ -299,7 +628,8 @@ const LessonPage = () => {
               </Text>
             </motion.div>
 
-            {timeLeft !== null && (
+            {/* Таймер обратного отсчёта — только когда активно тикает */}
+            {timeLeft !== null && timeLeft > 0 && (
               <motion.div
                 initial={{ scale: 0 }}
                 animate={{ scale: 1 }}
@@ -320,6 +650,42 @@ const LessonPage = () => {
               </motion.div>
             )}
 
+            {/* Сердечки (жизни) — всегда видны в босс-режиме */}
+            {isBossMode && (
+              <Badge
+                color="dark"
+                variant="filled"
+                size="lg"
+                styles={{ root: { fontFamily: 'JetBrains Mono, monospace', letterSpacing: '2px' } }}
+              >
+                {Array.from({ length: getMaxAttempts() }, (_, i) => (
+                  <span key={i} style={{
+                    color: i < (getMaxAttempts() - bossAttempt + 1) ? '#ff4136' : '#333',
+                    textShadow: i < (getMaxAttempts() - bossAttempt + 1) ? '0 0 8px #ff4136' : 'none',
+                    transition: 'all 0.5s',
+                  }}>
+                    {i < (getMaxAttempts() - bossAttempt + 1) ? '♥' : '×'}
+                  </span>
+                ))}
+              </Badge>
+            )}
+
+            {/* Кулдаун — показывается вместо таймера когда время вышло */}
+            {cooldownLeft > 0 && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                <Badge color="orange" variant="filled" size="lg" leftSection={<IconShieldLock size={14} />}>
+                  ⏳ {formatCooldown(cooldownLeft)}
+                </Badge>
+                <Progress 
+                  value={(cooldownLeft / Math.max(1, getCooldownTotal(lessonId))) * 100} 
+                  color="orange" 
+                  size="xs" 
+                  striped 
+                  animated 
+                />
+              </div>
+            )}
+
             {/* Прогресс набора кода */}
             <Box style={{ width: 100 }}>
               <Progress
@@ -332,6 +698,18 @@ const LessonPage = () => {
           </Group>
 
           <Group gap="xs">
+            {!isPyodideReady && !pyodideError && (
+              <Badge color="yellow" variant="light" leftSection={<Loader size={10} />}>
+                Загрузка Python...
+              </Badge>
+            )}
+
+            {pyodideError && (
+              <Badge color="red" variant="filled" title={pyodideError}>
+                ⚠️ Python недоступен
+              </Badge>
+            )}
+
             <Group gap={4}>
               <Kbd size="xs">Ctrl</Kbd>
               <Text size="xs" c="dimmed">+</Text>
@@ -349,16 +727,7 @@ const LessonPage = () => {
               {unlockedHints === 0 ? "ПОДСКАЗКА (50 XP)" : unlockedHints === 1 ? "РЕШЕНИЕ (150 XP)" : "ОТКРЫТО"}
             </Button>
 
-            {currentLesson.hasDebugger && (
-              <ActionIcon
-                variant="light"
-                color="cyan"
-                onClick={() => setShowDebugger(!showDebugger)}
-                title="Time Debugger"
-              >
-                <IconClock size={18} />
-              </ActionIcon>
-            )}
+
 
             <Button
               size="xs"
@@ -371,7 +740,7 @@ const LessonPage = () => {
           </Group>
         </Group>
 
-        <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
+        <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', flex: 1, overflow: isMobile ? 'auto' : 'hidden' }}>
 
           {/* LEFT PANEL */}
           <motion.div
@@ -379,15 +748,17 @@ const LessonPage = () => {
             animate={{ x: 0, opacity: 1 }}
             transition={{ type: 'spring', stiffness: 100 }}
             style={{
-              width: '40%',
+              width: isMobile ? '100%' : '40%',
+              minHeight: isMobile ? '50vh' : 'auto',
               display: 'flex',
               flexDirection: 'column',
-              borderRight: `1px solid ${borderColor}`,
+              borderRight: isMobile ? 'none' : `1px solid ${borderColor}`,
+              borderBottom: isMobile ? `1px solid ${borderColor}` : 'none',
               background: 'rgba(10,10,10,0.8)',
               backdropFilter: 'blur(5px)',
             }}
           >
-            <div style={{ padding: '20px', flex: 1, overflowY: 'auto' }}>
+            <div style={{ padding: '20px', flex: 1, overflowY: 'auto', overflowX: 'hidden' }}>
 
               {/* Глитч AI */}
               <motion.div
@@ -402,7 +773,6 @@ const LessonPage = () => {
                   style={{
                     border: '1px solid #00ff41',
                     position: 'relative',
-                    overflow: 'hidden',
                   }}
                 >
                   <Badge pos="absolute" top={-10} left={10} color="green" variant="filled" size="xs">
@@ -456,12 +826,62 @@ const LessonPage = () => {
                 )}
               </AnimatePresence>
 
-              {/* Дебаггер */}
-              <Collapse in={showDebugger}>
-                <Box mb="md">
-                  <TimeDebugger code={code} onClose={() => setShowDebugger(false)} />
-                </Box>
-              </Collapse>
+              {/* Boss briefing info */}
+              <AnimatePresence>
+                {isBossMode && showBossBriefing && cooldownLeft <= 0 && (
+                  <motion.div
+                    initial={{ opacity: 0, scale: 0.9 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0, scale: 0.9 }}
+                    transition={{ type: 'spring' }}
+                  >
+                    <Paper
+                      p="md"
+                      mb="md"
+                      style={{
+                        background: 'linear-gradient(135deg, rgba(255,0,0,0.08) 0%, rgba(255,65,54,0.05) 100%)',
+                        border: '1px solid rgba(255,65,54,0.4)',
+                        boxShadow: '0 0 20px rgba(255,0,0,0.1)',
+                      }}
+                    >
+                      <Group justify="space-between" mb="xs">
+                        <Badge color="red" variant="filled" size="sm">⚔️ НАЧАТЬ ОПЕРАЦИЮ</Badge>
+                        <Badge color="dark" variant="filled" size="xs">BOSS_FIGHT</Badge>
+                      </Group>
+                      <Group gap="lg" mt="xs">
+                        <Box>
+                          <Text size="xs" c="dimmed">ВРЕМЯ:</Text>
+                          <Text size="lg" c="red" fw={700} ff="Orbitron, sans-serif">{getBossTimeLimit(lessonId)}с</Text>
+                        </Box>
+                        <Box>
+                          <Text size="xs" c="dimmed">ПОПЫТКА:</Text>
+                          <Text size="lg" c="pink" fw={700} ff="Orbitron, sans-serif">{bossAttempt}/{getMaxAttempts()}</Text>
+                        </Box>
+                        <Box>
+                          <Text size="xs" c="dimmed">ЖИЗНИ:</Text>
+                          <Text size="lg" fw={700} ff="JetBrains Mono, monospace" style={{ letterSpacing: '4px' }}>
+                            {Array.from({ length: getMaxAttempts() }, (_, i) => (
+                              <span key={i} style={{
+                                color: i < (getMaxAttempts() - bossAttempt + 1) ? '#ff4136' : '#333',
+                                textShadow: i < (getMaxAttempts() - bossAttempt + 1) ? '0 0 10px #ff4136, 0 0 20px #ff413680' : 'none',
+                                transition: 'all 0.5s ease',
+                              }}>
+                                {i < (getMaxAttempts() - bossAttempt + 1) ? '♥' : '×'}
+                              </span>
+                            ))}
+                          </Text>
+                        </Box>
+                      </Group>
+                      <Text size="xs" c="dimmed" mt="sm" style={{ fontStyle: 'italic' }}>
+                        {bossAttempt <= 2 
+                          ? 'Первые 2 попытки — мгновенный повтор. Дальше придётся подождать.'
+                          : `После провала: ожидание перед следующей попыткой.`
+                        }
+                      </Text>
+                    </Paper>
+                  </motion.div>
+                )}
+              </AnimatePresence>
 
               {/* Информация о миссии */}
               <motion.div
@@ -501,22 +921,35 @@ const LessonPage = () => {
                 whileHover={{ scale: 1.02 }}
                 whileTap={{ scale: 0.98 }}
               >
-                <Button
-                  onClick={handleRunCode}
-                  loading={isLoading}
-                  fullWidth
-                  size="lg"
-                  color={themeColor}
-                  disabled={timeLeft === 0}
-                  leftSection={<IconPlayerPlay size={20} />}
-                  styles={{
-                    root: {
-                      boxShadow: `0 0 20px ${isBossMode ? 'rgba(255,65,54,0.3)' : 'rgba(0,255,65,0.3)'}`,
-                    }
-                  }}
-                >
-                  {isBossMode ? "⚡ ВЗЛОМАТЬ ЯДРО" : "▶ ВЫПОЛНИТЬ ВЗЛОМ"}
-                </Button>
+                <Group grow>
+                  <Button
+                    fullWidth
+                    size="lg"
+                    color={pyodideError ? 'red' : themeColor}
+                    disabled={timeLeft === 0 || !isPyodideReady || !!pyodideError || notification.type === 'success' || cooldownLeft > 0}
+                    leftSection={<IconPlayerPlay size={20} />}
+                    onClick={handleRunCode}
+                    styles={{
+                      root: {
+                        transition: 'all 0.3s',
+                        '&:hover': { transform: 'translateY(-2px)', boxShadow: `0 0 20px ${isBossMode ? 'rgba(255, 65, 54, 0.4)' : 'rgba(0, 255, 65, 0.4)'}` }
+                      }
+                    }}
+                  >
+                    {pyodideError ? "⚠️ Python unavailable" : isBossMode ? "⚡ HACK CORE" : "▶ EXECUTE HACK"}
+                  </Button>
+
+                  <Button
+                    size="lg"
+                    variant="outline"
+                    color="yellow"
+                    disabled={isLoading || !isPyodideReady || !!pyodideError}
+                    leftSection={<IconBug size={20} />}
+                    onClick={handleDebug}
+                  >
+                    DEBUG
+                  </Button>
+                </Group>
               </motion.div>
 
               {/* Уведомление о результате */}
@@ -583,10 +1016,15 @@ const LessonPage = () => {
             initial={{ x: 100, opacity: 0 }}
             animate={{ x: 0, opacity: 1 }}
             transition={{ type: 'spring', stiffness: 100 }}
-            style={{ width: '60%', display: 'flex', flexDirection: 'column' }}
+            style={{ 
+              width: isMobile ? '100%' : '60%', 
+              minHeight: isMobile ? '60vh' : 'auto',
+              display: 'flex', 
+              flexDirection: 'column' 
+            }}
           >
             {/* Редактор кода */}
-            <div style={{ height: '60%', position: 'relative' }}>
+            <div style={{ height: '60%', minHeight: isMobile ? '400px' : 'auto', position: 'relative' }}>
               <Suspense fallback={
                 <Skeleton
                   height="100%"
@@ -641,7 +1079,7 @@ const LessonPage = () => {
 
             {/* Табы вывода */}
             <div style={{ height: '40%', background: '#050505', borderTop: `1px solid ${borderColor}` }}>
-              <Tabs defaultValue="output" color="green">
+              <Tabs value={activeTab} onChange={setActiveTab} color="green" style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
                 <Tabs.List>
                   <Tabs.Tab value="output" leftSection={<IconFileCode size={14} />}>
                     PYTHON_OUTPUT
@@ -649,29 +1087,75 @@ const LessonPage = () => {
                   <Tabs.Tab value="console" leftSection={<IconTerminal size={14} />}>
                     SYSTEM_CONSOLE
                   </Tabs.Tab>
+                  <Tabs.Tab value="debug" leftSection={<IconBug size={14} />} disabled={!traceData}>
+                    DEBUGGER
+                  </Tabs.Tab>
                 </Tabs.List>
 
-                <Tabs.Panel value="output" p="sm" style={{ height: 'calc(100% - 40px)', overflowY: 'auto' }}>
+                <Tabs.Panel value="output" p="sm" style={{ flex: 1, overflowY: 'auto' }}>
                   <pre style={{
                     margin: 0,
                     whiteSpace: 'pre-wrap',
-                    color: terminalTextColor,
+                    color: pyodideError ? '#FF4136' : terminalTextColor,
                     fontFamily: 'JetBrains Mono, monospace',
                     fontSize: '14px',
-                    textShadow: `0 0 10px ${terminalTextColor}`,
+                    textShadow: `0 0 10px ${pyodideError ? '#FF4136' : terminalTextColor}`,
                   }}>
-                    {output || '> Ожидание выполнения кода..._'}
+                    {pyodideError
+                      ? (
+                        <Stack>
+                          <Text color="red">
+                            {`> ОШИБКА СИСТЕМЫ\n> ${pyodideError}\n>\n> Попробуйте:\n> 1. Обновить страницу (F5)\n> 2. Проверить подключение к интернету\n> 3. Использовать VPN если CDN заблокирован`}
+                          </Text>
+                          <Button
+                            color="red"
+                            variant="outline"
+                            size="xs"
+                            onClick={handleRetryConnection}
+                          >
+                            ↻ ПЕРЕПОДКЛЮЧИТЬ ЯДРО
+                          </Button>
+                        </Stack>
+                      )
+                      : output || '> Ожидание выполнения кода..._'}
                   </pre>
                 </Tabs.Panel>
 
-                <Tabs.Panel value="console" p={0} style={{ height: 'calc(100% - 40px)' }}>
+                <Tabs.Panel value="console" p={0} style={{ flex: 1, minHeight: 0 }}>
                   <HackerConsole />
+                </Tabs.Panel>
+
+                <Tabs.Panel value="debug" p={0} style={{ flex: 1, minHeight: 0 }}>
+                  {traceData && (
+                    <Debugger
+                      trace={traceData}
+                      code={code}
+                    />
+                  )}
                 </Tabs.Panel>
               </Tabs>
             </div>
           </motion.div>
         </div>
       </Stack>
+      {/* Red Flash Overlay */}
+      <div
+        ref={redFlashRef}
+        style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          width: '100%',
+          height: '100%',
+          backgroundColor: '#ff4136',
+          pointerEvents: 'none',
+          zIndex: 9999,
+          opacity: 0,
+          mixBlendMode: 'overlay',
+        }}
+      />
+
+
     </Box>
   );
 };

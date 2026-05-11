@@ -1,35 +1,32 @@
 import { Container, Title, Table, Avatar, Group, Text, Button, Paper } from '@mantine/core';
 import { Link } from 'react-router-dom';
 import { useEffect, useState } from 'react';
-import { api, syncServerStateToLocalStorage, type LeaderboardEntryDto } from '../api';
 
+// 1. Описываем структуру объекта пользователя для TypeScript
 interface UserRank {
-  id: string;
+  id: number;
   name: string;
   xp: number;
   avatar: string;
   isMe?: boolean;
 }
 
+const fakeUsers: UserRank[] = [
+  { id: 1, name: "AlexCode", xp: 2500, avatar: "AC" },
+  { id: 2, name: "PythonMaster", xp: 2100, avatar: "PM" },
+  { id: 3, name: "Ivan2025", xp: 1800, avatar: "IV" },
+  { id: 4, name: "Kate_Dev", xp: 1500, avatar: "KD" },
+];
+
 const LeaderboardPage = () => {
-  const [users, setUsers] = useState<UserRank[]>([]);
+  const [users, setUsers] = useState<UserRank[]>(fakeUsers);
 
   useEffect(() => {
-    const load = async () => {
-      await syncServerStateToLocalStorage().catch(() => undefined);
-      const [board, me] = await Promise.all([api.getLeaderboard(50), api.getMe().catch(() => null)]);
-
-      const mapped = board.map((u: LeaderboardEntryDto) => ({
-        id: u.userId,
-        name: u.displayName,
-        xp: u.totalXp,
-        avatar: u.displayName.slice(0, 2).toUpperCase(),
-        isMe: me ? u.userId === me.id : false,
-      }));
-      setUsers(mapped);
-    };
-
-    load().catch(console.error);
+    const myXP = Number(localStorage.getItem('userXP')) || 0;
+    const me: UserRank = { id: 99, name: "Вы (Студент)", xp: myXP, avatar: "ME", isMe: true };
+    
+    const allUsers = [...fakeUsers, me].sort((a, b) => b.xp - a.xp);
+    setUsers(allUsers);
   }, []);
 
   return (
@@ -49,13 +46,14 @@ const LeaderboardPage = () => {
             </Table.Tr>
           </Table.Thead>
           <Table.Tbody>
+            {/* 2. Указываем типы в map для исправления ошибки 7006 */}
             {users.map((user: UserRank, index: number) => (
               <Table.Tr key={user.id} bg={user.isMe ? 'rgba(0, 255, 65, 0.1)' : undefined}>
                 <Table.Td>
-                  {index === 0 && '🥇'}
-                  {index === 1 && '🥈'}
-                  {index === 2 && '🥉'}
-                  {index > 2 && index + 1}
+                    {index === 0 && "🥇"}
+                    {index === 1 && "🥈"}
+                    {index === 2 && "🥉"}
+                    {index > 2 && index + 1}
                 </Table.Td>
                 <Table.Td>
                   <Group gap="sm">
@@ -64,7 +62,7 @@ const LeaderboardPage = () => {
                   </Group>
                 </Table.Td>
                 <Table.Td style={{ textAlign: 'right' }}>
-                  <Text fw={700} c="green">{user.xp}</Text>
+                    <Text fw={700} c="green">{user.xp}</Text>
                 </Table.Td>
               </Table.Tr>
             ))}

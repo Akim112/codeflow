@@ -12,8 +12,8 @@ import LeaderboardPage from './pages/LeaderboardPage';
 import ShopPage from './pages/ShopPage';
 import { PageTransition } from './components/PageTransition';
 import { CyberLoader } from './components/CyberLoader';
+import { OpeningSequence } from './components/OpeningSequence';
 import { terminalThemes } from './data/shopItems';
-import { bootstrapAuth, syncServerStateToLocalStorage } from './api';
 
 const getPrimaryColor = (id: string) => {
   switch (id) {
@@ -30,10 +30,10 @@ const createAppTheme = (primaryColor: string) => createTheme({
   primaryColor,
   defaultRadius: 'sm',
   colors: {
-    green: ['#EBFBEE','#D3F9D8','#B2F2BB','#8CE99A','#69DB7C','#51CF66','#40C057','#37B24D','#2F9E44','#2B8A3E'],
-    red: ['#FFF5F5','#FFE3E3','#FFC9C9','#FFA8A8','#FF8787','#FF6B6B','#FA5252','#F03E3E','#E03131','#C92A2A'],
-    blue: ['#E7F5FF','#D0EBFF','#A5D8FF','#74C0FC','#4DABF7','#339AF0','#228BE6','#1C7ED6','#1971C2','#1864AB'],
-    yellow: ['#FFF9DB','#FFF3BF','#FFEC99','#FFE066','#FFD43B','#FCC419','#FAB005','#F59F00','#F08C00','#E67700'],
+    green: ['#EBFBEE', '#D3F9D8', '#B2F2BB', '#8CE99A', '#69DB7C', '#51CF66', '#40C057', '#37B24D', '#2F9E44', '#2B8A3E'],
+    red: ['#FFF5F5', '#FFE3E3', '#FFC9C9', '#FFA8A8', '#FF8787', '#FF6B6B', '#FA5252', '#F03E3E', '#E03131', '#C92A2A'],
+    blue: ['#E7F5FF', '#D0EBFF', '#A5D8FF', '#74C0FC', '#4DABF7', '#339AF0', '#228BE6', '#1C7ED6', '#1971C2', '#1864AB'],
+    yellow: ['#FFF9DB', '#FFF3BF', '#FFEC99', '#FFE066', '#FFD43B', '#FCC419', '#FAB005', '#F59F00', '#F08C00', '#E67700'],
   }
 });
 
@@ -43,6 +43,12 @@ function App() {
   const [activeThemeId, setActiveThemeId] = useState(localStorage.getItem('activeTheme') || 'classic');
   const currentThemeData = terminalThemes.find(t => t.id === activeThemeId) || terminalThemes[0];
   const [theme, setTheme] = useState(createAppTheme(getPrimaryColor(activeThemeId)));
+  const [hasSeenIntro, setHasSeenIntro] = useState(localStorage.getItem('hasSeenIntro') === 'true');
+
+  const handleIntroComplete = () => {
+    localStorage.setItem('hasSeenIntro', 'true');
+    setHasSeenIntro(true);
+  };
 
   // Симуляция загрузки
   useEffect(() => {
@@ -58,15 +64,6 @@ function App() {
     }, 100);
 
     return () => clearInterval(interval);
-  }, []);
-
-
-  useEffect(() => {
-    const initServer = async () => {
-      await bootstrapAuth().catch(() => undefined);
-      await syncServerStateToLocalStorage().catch(() => undefined);
-    };
-    initServer().catch(console.error);
   }, []);
 
   // Обновление темы
@@ -94,11 +91,19 @@ function App() {
     document.body.style.background = currentThemeData.bg;
   }, [currentThemeData]);
 
+  if (!hasSeenIntro) {
+    return (
+      <MantineProvider theme={theme} defaultColorScheme="dark">
+        <OpeningSequence onComplete={handleIntroComplete} />
+      </MantineProvider>
+    );
+  }
+
   if (isLoading) {
     return (
       <MantineProvider theme={theme} defaultColorScheme="dark">
-        <CyberLoader 
-          progress={loadProgress} 
+        <CyberLoader
+          progress={loadProgress}
           text="CODEFLOW"
           subtext="Инициализация системы..."
           color={currentThemeData.color}
