@@ -13,7 +13,9 @@ import {
 import { motion, AnimatePresence } from 'framer-motion';
 import { Typewriter } from 'react-simple-typewriter';
 
-import { lessons } from '../data/lessons';
+import { coursesApi } from '../api/courses';
+import { progressApi } from '../api/progress';
+
 import { achievements, calculateStats } from '../data/achievements';
 import { createGlitchState, glitchAvatars } from '../data/glitchCharacter';
 
@@ -40,7 +42,9 @@ const LessonPage = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const lessonId = Number(id);
-  const currentLesson = lessons.find(l => l.id === lessonId);
+
+  const [currentLesson, setCurrentLesson] = useState<any>(null);
+  const [pageLoading, setPageLoading] = useState(true);
 
   // --- СОСТОЯНИЯ ---
   const [code, setCode] = useState("");
@@ -64,18 +68,45 @@ const LessonPage = () => {
   const [cooldownLeft, setCooldownLeft] = useState(0);
   const [showBossBriefing, setShowBossBriefing] = useState(false);
 
+  const [nextLesson, setNextLesson] = useState<any>(null);
+
   // Ref для отслеживания активных запросов к воркеру
   const pendingRequests = useRef<Map<string, { resolve: (val: any) => void, reject: (err: any) => void, output: string }>>(new Map());
   const workerRef = useRef<Worker | null>(null);
   const redFlashRef = useRef<HTMLDivElement>(null);
   const isRunningRef = useRef(false); // Мьютекс для предотвращения двойного запуска
-  
+
   const isMobile = useMediaQuery('(max-width: 1024px)');
 
   const isBossMode = currentLesson?.isBoss || false;
   const themeColor = isBossMode ? 'red' : 'green';
   const terminalTextColor = isBossMode ? '#FF4136' : '#00FF41';
   const borderColor = isBossMode ? '#FF4136' : '#1A1B1E';
+
+  useEffect(() => {
+    const fetchLesson = async () => {
+      setPageLoading(true);
+      try {
+        const data = await coursesApi.getLessonById(lessonId);
+        setCurrentLesson(data);
+        if (data && data.initialCode) {
+          setCode(data.initialCode);
+        }
+        // Проверяем есть ли следующий урок в БД
+        try {
+          const next = await coursesApi.getLessonById(lessonId + 1);
+          setNextLesson(next);
+        } catch {
+          setNextLesson(null);
+        }
+      } catch (error) {
+        console.error("Ошибка загрузки урока:", error);
+      } finally {
+        setPageLoading(false);
+      }
+    };
+    fetchLesson();
+  }, [lessonId]);
 
   // --- ИНИЦИАЛИЗАЦИЯ WORKER ---
   // --- ИНИЦИАЛИЗАЦИЯ WORKER ---
@@ -182,7 +213,7 @@ const LessonPage = () => {
         const canPlay = canAttemptBoss(lessonId);
         const remaining = getCooldownRemaining(lessonId);
         const attemptData = getBossAttemptData(lessonId);
-        
+
         setBossAttempt(attemptData.attempt);
         setCooldownLeft(remaining);
 
@@ -226,10 +257,10 @@ const LessonPage = () => {
     if (timeLeft === 0 && !notification.type && isBossMode) {
       sounds.error();
       setIsError(true);
-      
+
       // Записываем провал и получаем информацию о следующей попытке
       const result = recordBossFailure(lessonId);
-      
+
       if (result.isLocked && result.cooldownSeconds >= 28800) {
         // Все 5 попыток использованы
         setNotification({
@@ -296,18 +327,19 @@ const LessonPage = () => {
   }, [code, currentLesson]);
 
   // --- ПОКУПКА ПОДСКАЗОК ---
-  const buyHint = useCallback(() => {
-    const currentXP = Number(localStorage.getItem('userXP')) || 0;
+  const buyHint = useCallback(async () => {
     const price = unlockedHints === 0 ? 50 : 150;
 
-    if (currentXP >= price) {
-      localStorage.setItem('userXP', String(currentXP - price));
+    try {
+      const result = await progressApi.purchaseHint(price);
+      // Update cached XP from server response
+      localStorage.setItem('userXP', String(result.totalXp));
       setUnlockedHints(prev => prev + 1);
       sounds.success();
       setGlitchState(createGlitchState({ type: 'hint' }));
-    } else {
+    } catch (err: any) {
       sounds.error();
-      alert("НЕДОСТАТОЧНО XP!");
+      alert(err.message || "НЕДОСТАТОЧНО XP!");
     }
   }, [unlockedHints]);
 
@@ -422,7 +454,24 @@ const LessonPage = () => {
       });
 
       if (resultOutput.trim() === currentLesson.expectedOutput) {
-        // УСПЕХ
+        // --- Отправляем результат на бэкенд ---
+        let earnedXp = currentLesson.xp;
+        try {
+          const progressResult = await progressApi.completeLesson(lessonId, errorCount === 0);
+          earnedXp = progressResult.xpEarned;
+          console.log("Прогресс сохранен в БД, XP:", earnedXp);
+          // Update cached XP
+          const cachedCompleted: number[] = JSON.parse(localStorage.getItem('completedLessons') || '[]');
+          if (!cachedCompleted.includes(lessonId)) {
+            cachedCompleted.push(lessonId);
+            localStorage.setItem('completedLessons', JSON.stringify(cachedCompleted));
+          }
+        } catch (dbErr) {
+          console.error("Не удалось сохранить прогресс в БД:", dbErr);
+          earnedXp = Math.floor(currentLesson.xp * getXPMultiplier());
+        }
+
+        // Визуальные эффекты
         music.start('victory');
         sounds.success();
         setGlitchState(createGlitchState({ type: 'success', isSuccess: true }));
@@ -432,71 +481,12 @@ const LessonPage = () => {
           spread: 100,
           origin: { y: 0.6 },
           colors: isBossMode ? ['#FF0000', '#FF4136', '#FF6B6B'] : ['#00FF41', '#00CC33', '#FFFFFF'],
-          shapes: ['star', 'circle'],
-        });
-
-        // Ещё confetti волны
-        setTimeout(() => confetti({ particleCount: 100, angle: 60, spread: 55, origin: { x: 0 } }), 200);
-        setTimeout(() => confetti({ particleCount: 100, angle: 120, spread: 55, origin: { x: 1 } }), 400);
-
-        // XP с множителем
-        const finalXP = Math.floor(currentLesson.xp * getXPMultiplier());
-        localStorage.setItem('userXP', String((Number(localStorage.getItem('userXP')) || 0) + finalXP));
-
-        // Репутация
-        awardMissionReputation(lessonId, errorCount === 0);
-
-        // Прогресс
-        const completedRaw = localStorage.getItem('completedLessons');
-        const completed: number[] = completedRaw ? JSON.parse(completedRaw) : [];
-        if (!completed.includes(lessonId)) {
-          completed.push(lessonId);
-          localStorage.setItem('completedLessons', JSON.stringify(completed));
-        }
-
-        // Clean streak
-        const newCleanStreak = errorCount === 0 ? cleanStreak + 1 : 0;
-        setCleanStreak(newCleanStreak);
-        localStorage.setItem('cleanStreak', String(newCleanStreak));
-
-        // Fast boss kill
-        if (isBossMode && timeLeft && timeLeft > 30) {
-          localStorage.setItem('fastBossKill', 'true');
-        }
-
-        // Сбросить данные босса при успехе
-        if (isBossMode) {
-          resetBossOnSuccess(lessonId);
-        }
-
-        // Проверка достижений
-        let achievementMessage = "";
-        const stats = calculateStats();
-        const unlockedRaw = localStorage.getItem('unlockedAchievements');
-        let unlocked: string[] = unlockedRaw ? JSON.parse(unlockedRaw) : [];
-
-        achievements.forEach(ach => {
-          if (!unlocked.includes(ach.id) && ach.condition(stats)) {
-            unlocked.push(ach.id);
-            localStorage.setItem('unlockedAchievements', JSON.stringify(unlocked));
-            achievementMessage += `\n🏆 ДОСТИЖЕНИЕ: ${ach.title}!`;
-            sounds.success();
-          }
         });
 
         setNotification({
           type: 'success',
-          message: `ДОСТУП ПОЛУЧЕН! +${finalXP} XP${achievementMessage}`
+          message: `ДОСТУП ПОЛУЧЕН! +${earnedXp} XP`
         });
-
-        // Моральный выбор на боссах
-        if (isBossMode) {
-          setTimeout(() => setMoralModalOpened(true), 2000);
-          // Для финального босса — показать StoryOutcome после морального выбора
-          if (lessonId === 15) {
-            setTimeout(() => setStoryOutcomeOpened(true), 4000);
-          }
-        }
 
         setErrorCount(0);
       } else {
@@ -557,22 +547,35 @@ const LessonPage = () => {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [handleRunCode]);
 
+  // Пока данные скачиваются с бэкенда
+  if (pageLoading) {
+    return (
+      <Center h="100vh" style={{ background: '#050505' }}>
+        <Stack align="center" gap="md">
+          <Loader color="green" size="xl" variant="bars" />
+          <Text c="green" ff="monospace" className="glitch" data-text="ПОДКЛЮЧЕНИЕ К УЗЛУ...">
+            ПОДКЛЮЧЕНИЕ К УЗЛУ...
+          </Text>
+        </Stack>
+      </Center>
+    );
+  }
+
+  // Если загрузка прошла, но такого урока нет в базе
   if (!currentLesson) {
     return (
       <Center h="100vh" style={{ background: '#000' }}>
         <Stack align="center">
-          <Text c="red" size="xl" className="glitch" data-text="МИССИЯ НЕ НАЙДЕНА">
-            МИССИЯ НЕ НАЙДЕНА
-          </Text>
+          <Text c="red" size="xl" ff="monospace">МИССИЯ НЕ НАЙДЕНА В БАЗЕ ДАННЫХ</Text>
           <Button onClick={() => navigate('/courses')} variant="outline" color="red">
-            Вернуться к миссиям
+            Вернуться в список
           </Button>
         </Stack>
       </Center>
     );
   }
 
-  const nextLesson = lessons.find(l => l.id === lessonId + 1);
+
 
   return (
     <Box
@@ -676,12 +679,12 @@ const LessonPage = () => {
                 <Badge color="orange" variant="filled" size="lg" leftSection={<IconShieldLock size={14} />}>
                   ⏳ {formatCooldown(cooldownLeft)}
                 </Badge>
-                <Progress 
-                  value={(cooldownLeft / Math.max(1, getCooldownTotal(lessonId))) * 100} 
-                  color="orange" 
-                  size="xs" 
-                  striped 
-                  animated 
+                <Progress
+                  value={(cooldownLeft / Math.max(1, getCooldownTotal(lessonId))) * 100}
+                  color="orange"
+                  size="xs"
+                  striped
+                  animated
                 />
               </div>
             )}
@@ -873,7 +876,7 @@ const LessonPage = () => {
                         </Box>
                       </Group>
                       <Text size="xs" c="dimmed" mt="sm" style={{ fontStyle: 'italic' }}>
-                        {bossAttempt <= 2 
+                        {bossAttempt <= 2
                           ? 'Первые 2 попытки — мгновенный повтор. Дальше придётся подождать.'
                           : `После провала: ожидание перед следующей попыткой.`
                         }
@@ -1016,11 +1019,11 @@ const LessonPage = () => {
             initial={{ x: 100, opacity: 0 }}
             animate={{ x: 0, opacity: 1 }}
             transition={{ type: 'spring', stiffness: 100 }}
-            style={{ 
-              width: isMobile ? '100%' : '60%', 
+            style={{
+              width: isMobile ? '100%' : '60%',
               minHeight: isMobile ? '60vh' : 'auto',
-              display: 'flex', 
-              flexDirection: 'column' 
+              display: 'flex',
+              flexDirection: 'column'
             }}
           >
             {/* Редактор кода */}

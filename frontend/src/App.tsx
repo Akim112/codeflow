@@ -4,16 +4,22 @@ import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { MantineProvider, createTheme } from '@mantine/core';
 import { useEffect, useState } from 'react';
 
+
+
 import HomePage from './pages/HomePage';
 import CoursesPage from './pages/CoursesPage';
 import LessonPage from './pages/LessonPage';
 import ProfilePage from './pages/ProfilePage';
 import LeaderboardPage from './pages/LeaderboardPage';
+import AuthPage from './pages/AuthPage';
+import { authApi } from './api/auth';
 import ShopPage from './pages/ShopPage';
 import { PageTransition } from './components/PageTransition';
 import { CyberLoader } from './components/CyberLoader';
 import { OpeningSequence } from './components/OpeningSequence';
+import { CustomCursor } from './components/CustomCursor';
 import { terminalThemes } from './data/shopItems';
+
 
 const getPrimaryColor = (id: string) => {
   switch (id) {
@@ -99,6 +105,18 @@ function App() {
     );
   }
 
+  if (!authApi.isLoggedIn()) {
+    return (
+      <MantineProvider theme={theme} defaultColorScheme="dark">
+        <BrowserRouter>
+          <Routes>
+            <Route path="*" element={<AuthPage />} />
+          </Routes>
+        </BrowserRouter>
+      </MantineProvider>
+    );
+  }
+
   if (isLoading) {
     return (
       <MantineProvider theme={theme} defaultColorScheme="dark">
@@ -114,6 +132,7 @@ function App() {
 
   return (
     <MantineProvider theme={theme} defaultColorScheme="dark">
+      <CustomCursor />
       <BrowserRouter>
         <PageTransition>
           <Routes>
@@ -123,6 +142,7 @@ function App() {
             <Route path="/profile" element={<ProfilePage />} />
             <Route path="/leaderboard" element={<LeaderboardPage />} />
             <Route path="/shop" element={<ShopPage />} />
+            <Route path="/auth" element={<AuthPage />} />
           </Routes>
         </PageTransition>
       </BrowserRouter>

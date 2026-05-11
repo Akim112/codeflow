@@ -1,18 +1,70 @@
-import { Container, Title, SimpleGrid, Card, Text, Badge, Button, Group, Progress } from '@mantine/core';
+import { Container, Title, SimpleGrid, Card, Text, Badge, Button, Group, Progress, Loader } from '@mantine/core';
 import { Link } from 'react-router-dom';
-import { courses, lessons } from '../data/lessons';
 import { motion } from 'framer-motion';
 import { useEffect, useState } from 'react';
+import { coursesApi, type Course, type Lesson } from '../api/courses';
+import { progressApi, type UserProgressSummary } from '../api/progress';
 
 const CoursesPage = () => {
-  const [completedLessons, setCompletedLessons] = useState<number[]>([]);
+  const [courses, setCourses] = useState<Course[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [completedLessonIds, setCompletedLessonIds] = useState<number[]>([]);
+  const [courseLessons, setCourseLessons] = useState<Record<number, Lesson[]>>({});
 
   useEffect(() => {
-    const savedProgress = localStorage.getItem('completedLessons');
-    if (savedProgress) {
-      setCompletedLessons(JSON.parse(savedProgress));
-    }
+    const fetchData = async () => {
+      try {
+        // Load courses and progress in parallel
+        const [coursesData, progressData] = await Promise.allSettled([
+          coursesApi.getAllCourses(),
+          progressApi.getMyProgress(),
+        ]);
+
+        if (coursesData.status === 'fulfilled') {
+          setCourses(coursesData.value);
+
+          // Load lessons for each course
+          const lessonsMap: Record<number, Lesson[]> = {};
+          const lessonPromises = coursesData.value
+            .filter(c => c.totalLessons > 0)
+            .map(async (course) => {
+              try {
+                const lessons = await coursesApi.getLessonsForCourse(course.id);
+                lessonsMap[course.id] = lessons;
+              } catch (e) {
+                console.error(`Failed to load lessons for course ${course.id}:`, e);
+              }
+            });
+          await Promise.all(lessonPromises);
+          setCourseLessons(lessonsMap);
+        }
+
+        if (progressData.status === 'fulfilled') {
+          setCompletedLessonIds(progressData.value.completedLessonIds);
+          // Cache
+          localStorage.setItem('completedLessons', JSON.stringify(progressData.value.completedLessonIds));
+        } else {
+          // Fallback
+          setCompletedLessonIds(JSON.parse(localStorage.getItem('completedLessons') || '[]'));
+        }
+      } catch (error) {
+        console.error("Ошибка при загрузке данных:", error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchData();
   }, []);
+
+  if (isLoading) {
+    return (
+      <Container size="lg" py="xl" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '80vh' }}>
+        <Loader color="green" />
+        <Text ml="md" c="green">Загрузка доступных операций...</Text>
+      </Container>
+    );
+  }
 
   return (
     <Container size="lg" py="xl">
@@ -25,28 +77,25 @@ const CoursesPage = () => {
 
       <SimpleGrid cols={{ base: 1, sm: 2, lg: 3 }} spacing="lg">
         {courses.map((course, index) => {
-          // Расчет прогресса (остается без изменений)
-          const completedCount = lessons.filter(lesson => 
-            lesson.courseId === course.id && completedLessons.includes(lesson.id)
-          ).length;
+          const lessons = courseLessons[course.id] || [];
+          const completedCount = lessons.filter(l => completedLessonIds.includes(l.id)).length;
           const progressPercent = course.totalLessons > 0 ? (completedCount / course.totalLessons) * 100 : 0;
 
-          // --- НОВАЯ УМНАЯ ЛОГИКА ДЛЯ КНОПКИ ---
-          // 1. Находим все уроки, относящиеся к этому курсу
-          const lessonsInCourse = lessons.filter(l => l.courseId === course.id);
+          // Find the first uncompleted lesson to link to
+          const firstUncompletedLesson = lessons.find(l => !completedLessonIds.includes(l.id));
+          const firstLesson = lessons.length > 0 ? lessons[0] : null;
+          const targetLesson = firstUncompletedLesson || firstLesson;
+          const buttonLink = targetLesson ? `/lesson/${targetLesson.id}` : '#';
 
-          // 2. Находим первый урок, которого НЕТ в списке пройденных
-          const nextLesson = lessonsInCourse.find(l => !completedLessons.includes(l.id));
-
-          // 3. Определяем, куда вести пользователя
-          const isCourseCompleted = !nextLesson; // Если следующий урок не найден, курс пройден
-          const buttonLink = isCourseCompleted ? "#" : `/lesson/${nextLesson.id}`;
-          const buttonText = isCourseCompleted ? "ОПЕРАЦИЯ ЗАВЕРШЕНА" : "ПРОДОЛЖИТЬ ОПЕРАЦИЮ";
-          // --- КОНЕЦ НОВОЙ ЛОГИКИ ---
+          const buttonText = completedCount === 0
+            ? "НАЧАТЬ ОПЕРАЦИЮ"
+            : completedCount >= course.totalLessons
+              ? "✓ ЗАВЕРШЕНО"
+              : "ПРОДОЛЖИТЬ";
 
           return (
             <motion.div
-              key={course.id} 
+              key={course.id}
               initial={{ opacity: 0, y: 50 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: index * 0.15 }}
@@ -58,19 +107,19 @@ const CoursesPage = () => {
                 </Group>
 
                 <Text size="sm" c="dimmed" mb="md" style={{ minHeight: 60 }}>
-                  {course.desc}
+                  {course.description}
                 </Text>
 
                 <Text size="xs" c="dimmed" mb={5}>Прогресс выполнения: {completedCount} / {course.totalLessons}</Text>
-                <Progress value={progressPercent} color={course.color} size="sm" mb="md" animated />
+                <Progress value={progressPercent} color={course.color} size="sm" mb="md" />
 
-                <Button 
-                  component={Link} 
-                  to={buttonLink} 
-                  disabled={isCourseCompleted || course.totalLessons === 0}
+                <Button
+                  component={Link}
+                  to={buttonLink}
+                  disabled={course.totalLessons === 0}
                   fullWidth
                   color={course.color}
-                  variant={isCourseCompleted ? "outline" : "filled"}
+                  variant={completedCount >= course.totalLessons && course.totalLessons > 0 ? 'light' : 'filled'}
                 >
                   {course.totalLessons === 0 ? "СКОРО В СЕТИ" : buttonText}
                 </Button>

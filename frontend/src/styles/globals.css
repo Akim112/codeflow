@@ -493,3 +493,51 @@ pre {
 }
 
 /* Блоки RESPONSIVE и PRINT STYLES удалены, так как они ссылались только на удаленные выше багованные элементы (glitch, body::before, body::after) */
+
+/* ═══ CUSTOM CURSOR ═══ */
+/* Кастомный курсор-прицел вместо системного */
+*, *::before, *::after {
+  cursor: none !important;
+}
+
+.custom-cursor {
+  position: fixed;
+  width: 20px;
+  height: 20px;
+  border: 2px solid var(--neon-green, #00ff41);
+  border-radius: 50%;
+  pointer-events: none;
+  z-index: 99999;
+  transform: translate(-50%, -50%);
+  transition: width 0.15s, height 0.15s, border-color 0.15s, background 0.15s;
+  mix-blend-mode: difference;
+  box-shadow: 0 0 10px rgba(0, 255, 65, 0.5);
+}
+
+.custom-cursor::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 4px;
+  height: 4px;
+  background: var(--neon-green, #00ff41);
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+  box-shadow: 0 0 6px var(--neon-green, #00ff41);
+}
+
+/* Курсор увеличивается при наведении на кликабельные элементы */
+.custom-cursor.cursor-hover {
+  width: 40px;
+  height: 40px;
+  border-color: #00fff9;
+  background: rgba(0, 255, 65, 0.1);
+  box-shadow: 0 0 20px rgba(0, 255, 65, 0.4);
+}
+
+.custom-cursor.cursor-click {
+  width: 16px;
+  height: 16px;
+  background: rgba(0, 255, 65, 0.3);
+}
