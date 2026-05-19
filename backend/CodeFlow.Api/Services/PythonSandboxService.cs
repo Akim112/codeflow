@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Text;
+using System.ComponentModel;
 
 namespace CodeFlow.Api.Services;
 
@@ -35,33 +36,51 @@ public class PythonSandboxService : IPythonSandboxService
             {
                 FileName = "docker",
                 Arguments = args,
+                WorkingDirectory = workDir,
                 RedirectStandardOutput = true,
                 RedirectStandardError = true,
                 UseShellExecute = false,
                 CreateNoWindow = true
             };
 
-            using var process = new Process { StartInfo = startInfo };
-            var outputSb = new StringBuilder();
-            var errorSb = new StringBuilder();
-            process.OutputDataReceived += (_, e) => { if (e.Data != null) outputSb.AppendLine(e.Data); };
-            process.ErrorDataReceived += (_, e) => { if (e.Data != null) errorSb.AppendLine(e.Data); };
-
-            process.Start();
-            process.BeginOutputReadLine();
-            process.BeginErrorReadLine();
-
-            var completed = await Task.Run(() => process.WaitForExit((timeoutSec + 5) * 1000), ct);
-            if (!completed)
+            try
             {
-                try { process.Kill(entireProcessTree: true); } catch { /* ignore */ }
-                return new RunResult(false, outputSb.ToString(), errorSb.ToString(), null, "Timeout");
+                return await RunProcessAsync(startInfo, timeoutSec, ct);
             }
-
-            var output = outputSb.ToString().TrimEnd();
-            var error = errorSb.ToString().TrimEnd();
-            var success = process.ExitCode == 0;
-            return new RunResult(success, output, error.Length > 0 ? error : null, process.ExitCode, success ? null : "Execution failed");
+            catch (Exception ex)
+            {
+                // Резервный запуск без Docker (только для локальной разработки).
+                _logger.LogWarning(ex, "Docker is unavailable, falling back to local python3 execution");
+                try
+                {
+                    var fallback = new ProcessStartInfo
+                    {
+                        FileName = "python3",
+                        Arguments = "main.py",
+                        WorkingDirectory = workDir,
+                        RedirectStandardOutput = true,
+                        RedirectStandardError = true,
+                        UseShellExecute = false,
+                        CreateNoWindow = true
+                    };
+                    return await RunProcessAsync(fallback, timeoutSec, ct);
+                }
+                catch (Exception py3Ex)
+                {
+                    _logger.LogWarning(py3Ex, "python3 is unavailable, trying python");
+                    var fallbackPython = new ProcessStartInfo
+                    {
+                        FileName = "python",
+                        Arguments = "main.py",
+                        WorkingDirectory = workDir,
+                        RedirectStandardOutput = true,
+                        RedirectStandardError = true,
+                        UseShellExecute = false,
+                        CreateNoWindow = true
+                    };
+                    return await RunProcessAsync(fallbackPython, timeoutSec, ct);
+                }
+            }
         }
         catch (Exception ex)
         {
@@ -72,5 +91,30 @@ public class PythonSandboxService : IPythonSandboxService
         {
             try { if (Directory.Exists(workDir)) Directory.Delete(workDir, recursive: true); } catch { /* ignore */ }
         }
+    }
+
+    private static async Task<RunResult> RunProcessAsync(ProcessStartInfo startInfo, int timeoutSec, CancellationToken ct)
+    {
+        using var process = new Process { StartInfo = startInfo };
+        var outputSb = new StringBuilder();
+        var errorSb = new StringBuilder();
+        process.OutputDataReceived += (_, e) => { if (e.Data != null) outputSb.AppendLine(e.Data); };
+        process.ErrorDataReceived += (_, e) => { if (e.Data != null) errorSb.AppendLine(e.Data); };
+
+        process.Start();
+        process.BeginOutputReadLine();
+        process.BeginErrorReadLine();
+
+        var completed = await Task.Run(() => process.WaitForExit((timeoutSec + 5) * 1000), ct);
+        if (!completed)
+        {
+            try { process.Kill(entireProcessTree: true); } catch { }
+            return new RunResult(false, outputSb.ToString(), errorSb.ToString(), null, "Timeout");
+        }
+
+        var output = outputSb.ToString().TrimEnd();
+        var error = errorSb.ToString().TrimEnd();
+        var success = process.ExitCode == 0;
+        return new RunResult(success, output, error.Length > 0 ? error : null, process.ExitCode, success ? null : "Execution failed");
     }
 }

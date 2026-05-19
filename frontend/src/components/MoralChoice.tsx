@@ -1,61 +1,40 @@
 import { Modal, Button, Title, Text, Stack, Box } from '@mantine/core';
-import { addReputation } from '../data/reputationSystem';
+import { recordMoralChoice, chapterChoices, getChoiceIntro, getPreviousConsequence, ChapterChoice } from '../data/storyOutcomes';
+import { progressApi } from '../api/progress';
 import { sounds } from '../utils/audio';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 
 interface Props {
   opened: boolean;
   onClose: () => void;
   chapter: string;
+  lessonId: number;
 }
 
-export const MoralChoice = ({ opened, onClose, chapter }: Props) => {
-  const handleChoice = (factionId: string, xpBonus: number) => {
-    addReputation(factionId, 50);
-    
-    const currentXP = Number(localStorage.getItem('userXP') || '0');
-    localStorage.setItem('userXP', String(currentXP + xpBonus));
-    
-    sounds.success();
-    onClose();
+export const MoralChoice = ({ opened, onClose, chapter, lessonId }: Props) => {
+  const handleChoice = async (choice: ChapterChoice) => {
+    try {
+      const result = await progressApi.moralChoice(choice.faction, lessonId);
+      localStorage.setItem('userXP', String(result.totalXp));
+      recordMoralChoice(lessonId, chapter, choice.faction);
+      sounds.success();
+      onClose();
+    } catch {
+      sounds.error();
+      alert('Не удалось сохранить выбор. Попробуйте снова.');
+    }
   };
 
-  const choices = [
-    {
-      faction: 'data_brokers',
-      xp: 500,
-      color: 'blue',
-      icon: '💾',
-      title: 'ПРОДАТЬ НА ЧЁРНОМ РЫНКЕ',
-      desc: '+500 XP | +50 репутации у Торговцев Данными',
-      gradient: 'linear-gradient(135deg, rgba(0,100,255,0.1) 0%, rgba(0,50,150,0.1) 100%)',
-    },
-    {
-      faction: 'ai_ethicists',
-      xp: 300,
-      color: 'cyan',
-      icon: '📢',
-      title: 'ОПУБЛИКОВАТЬ АНОНИМНО',
-      desc: '+300 XP | +50 репутации у AI-Этиков',
-      gradient: 'linear-gradient(135deg, rgba(0,255,255,0.1) 0%, rgba(0,150,150,0.1) 100%)',
-    },
-    {
-      faction: 'ghost_protocol',
-      xp: 100,
-      color: 'gray',
-      icon: '🗑️',
-      title: 'УНИЧТОЖИТЬ ДАННЫЕ',
-      desc: '+100 XP | +50 репутации у Протокола Призрак',
-      gradient: 'linear-gradient(135deg, rgba(100,100,100,0.1) 0%, rgba(50,50,50,0.1) 100%)',
-    },
-  ];
+  const choices = chapterChoices[chapter] || chapterChoices["Глава 1: Проникновение"];
+  const intro = getChoiceIntro(chapter);
+  const previousConsequence = getPreviousConsequence(lessonId);
 
   return (
-    <Modal 
-      opened={opened} 
-      onClose={onClose} 
-      withCloseButton={false} 
-      centered 
+    <Modal
+      opened={opened}
+      onClose={onClose}
+      withCloseButton={false}
+      centered
       size="lg"
       overlayProps={{ backgroundOpacity: 0.95, blur: 20 }}
       styles={{
@@ -66,7 +45,6 @@ export const MoralChoice = ({ opened, onClose, chapter }: Props) => {
         }
       }}
     >
-      {/* Сканлайн эффект */}
       <Box
         style={{
           position: 'absolute',
@@ -85,20 +63,50 @@ export const MoralChoice = ({ opened, onClose, chapter }: Props) => {
         animate={{ scale: 1, opacity: 1 }}
         transition={{ type: 'spring', duration: 0.5 }}
       >
-        <Title order={3} c="red" mb="md" ta="center" className="glitch" data-text="⚠️ КРИТИЧЕСКИЙ ВЫБОР">
-          ⚠️ КРИТИЧЕСКИЙ ВЫБОР
+        <Title order={3} c="red" mb="md" ta="center" className="glitch" data-text={intro.title}>
+          {intro.title}
         </Title>
-        
+
         <Text c="dimmed" ta="center" mb="xs" ff="monospace" size="xs">
           {chapter}
         </Text>
-        
+
+        <AnimatePresence>
+          {previousConsequence && (
+            <motion.div
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: 'auto' }}
+              transition={{ delay: 0.3 }}
+            >
+              <Box
+                mb="md"
+                p="sm"
+                style={{
+                  background: 'rgba(255,200,0,0.05)',
+                  border: '1px solid rgba(255,200,0,0.2)',
+                  borderRadius: '4px',
+                }}
+              >
+                <Text size="xs" c="yellow" fw={700} mb={4}>
+                  📜 ПОСЛЕДСТВИЕ ПРЕДЫДУЩЕГО ВЫБОРА:
+                </Text>
+                <Text size="xs" c="yellow.3" style={{ fontStyle: 'italic' }}>
+                  {previousConsequence}
+                </Text>
+              </Box>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
         <Text mb="xl" ta="center" size="lg" c="gray.3">
-          Вы получили доступ к секретным архивам OmniCorp. 
-          <br/>
-          <Text span c="red" fw={700}>Что вы сделаете с этими данными?</Text>
+          {intro.description.split('\n').map((line, i) => (
+            <span key={i}>
+              {line}
+              {i < intro.description.split('\n').length - 1 && <br />}
+            </span>
+          ))}
         </Text>
-        
+
         <Stack gap="md">
           {choices.map((choice, index) => (
             <motion.div
@@ -107,12 +115,12 @@ export const MoralChoice = ({ opened, onClose, chapter }: Props) => {
               animate={{ x: 0, opacity: 1 }}
               transition={{ delay: index * 0.1 + 0.2 }}
             >
-              <Button 
-                variant="outline" 
-                color={choice.color} 
+              <Button
+                variant="outline"
+                color={choice.color}
                 size="lg"
                 fullWidth
-                onClick={() => handleChoice(choice.faction, choice.xp)}
+                onClick={() => handleChoice(choice).catch(() => undefined)}
                 styles={{
                   root: {
                     height: 'auto',
@@ -133,7 +141,6 @@ export const MoralChoice = ({ opened, onClose, chapter }: Props) => {
         </Stack>
       </motion.div>
 
-      {/* CSS анимации */}
       <style>{`
         @keyframes pulse-border {
           0%, 100% { box-shadow: 0 0 20px rgba(255,65,54,0.3); }

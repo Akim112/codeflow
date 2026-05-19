@@ -1,35 +1,65 @@
-import { Container, Title, SimpleGrid, Card, Text, Button, Stack, Box } from '@mantine/core';
+import { Container, Title, SimpleGrid, Card, Text, Button, Stack, Box, Loader } from '@mantine/core';
 import { Link } from 'react-router-dom';
 import { useState, useEffect } from 'react';
 import { terminalThemes } from '../data/shopItems';
 import { sounds } from '../utils/audio';
 import { motion } from 'framer-motion';
+import { shopApi, type ShopItem } from '../api/shop';
+import { usersApi } from '../api/users';
 
 const ShopPage = () => {
   const [xp, setXp] = useState(0);
   const [ownedThemes, setOwnedThemes] = useState<string[]>(['classic']);
   const [activeTheme, setActiveTheme] = useState('classic');
+  const [isLoading, setIsLoading] = useState(true);
+  const [purchasing, setPurchasing] = useState<string | null>(null);
 
   useEffect(() => {
-    setXp(Number(localStorage.getItem('userXP')) || 0);
-    setOwnedThemes(JSON.parse(localStorage.getItem('ownedThemes') || '["classic"]'));
-    setActiveTheme(localStorage.getItem('activeTheme') || 'classic');
+    const loadData = async () => {
+      try {
+        const user = await usersApi.getMe();
+        setXp(user.totalXp);
+        localStorage.setItem('userXP', String(user.totalXp));
+      } catch {
+        setXp(Number(localStorage.getItem('userXP')) || 0);
+      }
+
+      try {
+        const myItems = await shopApi.getMyItems();
+        const ownedIds = myItems.map(item => item.id);
+        if (!ownedIds.includes('classic')) ownedIds.unshift('classic');
+        setOwnedThemes(ownedIds);
+        localStorage.setItem('ownedThemes', JSON.stringify(ownedIds));
+      } catch {
+        setOwnedThemes(JSON.parse(localStorage.getItem('ownedThemes') || '["classic"]'));
+      }
+
+      setActiveTheme(localStorage.getItem('activeTheme') || 'classic');
+      setIsLoading(false);
+    };
+
+    loadData();
   }, []);
 
-  const handleBuy = (themeId: string, price: number) => {
-    if (xp >= price) {
-      const newXP = xp - price;
+  const handleBuy = async (themeId: string, _price: number) => {
+    setPurchasing(themeId);
+    try {
+      await shopApi.purchase(themeId);
+
+      const user = await usersApi.getMe();
+      setXp(user.totalXp);
+      localStorage.setItem('userXP', String(user.totalXp));
+
       const newOwned = [...ownedThemes, themeId];
-      
-      localStorage.setItem('userXP', String(newXP));
-      localStorage.setItem('ownedThemes', JSON.stringify(newOwned));
-      
-      setXp(newXP);
       setOwnedThemes(newOwned);
+      localStorage.setItem('ownedThemes', JSON.stringify(newOwned));
       sounds.success();
-    } else {
+    } catch (error: any) {
       sounds.error();
-      alert('⚠️ НЕДОСТАТОЧНО XP!');
+      const msg = error?.message || 'Ошибка покупки';
+      alert(`⚠️ ${msg}`);
+    } finally {
+      setPurchasing(null);
     }
   };
 
@@ -42,6 +72,15 @@ const ShopPage = () => {
     window.dispatchEvent(new Event('theme-changed'));
     window.dispatchEvent(new Event('storage'));
   };
+
+  if (isLoading) {
+    return (
+      <Container size="lg" py="xl" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '80vh' }}>
+        <Loader color="green" />
+        <Text ml="md" c="green">Загрузка магазина...</Text>
+      </Container>
+    );
+  }
 
   return (
     <Container size="lg" py="xl">
@@ -56,7 +95,7 @@ const ShopPage = () => {
               💰 БАЛАНС: {xp} XP
             </Text>
           </Stack>
-          <Button variant="outline" component={Link} to="/" leftSection="←">
+          <Button variant="outline" color="green" component={Link} to="/" leftSection="←">
             ГЛАВНАЯ
           </Button>
         </div>
@@ -66,6 +105,7 @@ const ShopPage = () => {
           {terminalThemes.map((theme, index) => {
             const isOwned = ownedThemes.includes(theme.id);
             const isActive = activeTheme === theme.id;
+            const isPurchasing = purchasing === theme.id;
 
             return (
               <motion.div
@@ -85,7 +125,7 @@ const ShopPage = () => {
                     overflow: 'hidden',
                     transition: 'all 0.3s'
                   }}
-                  className={isActive ? 'boss-mode' : ''}
+                  className={`cyber-card ${isActive ? 'boss-mode' : ''}`}
                 >
                   {/* ПРЕВЬЮ */}
                   <Box
@@ -148,7 +188,8 @@ const ShopPage = () => {
                       variant="light"
                       color="yellow"
                       onClick={() => handleBuy(theme.id, theme.price)}
-                      disabled={xp < theme.price}
+                      disabled={xp < theme.price || isPurchasing}
+                      loading={isPurchasing}
                     >
                       {xp >= theme.price ? `КУПИТЬ ЗА ${theme.price} XP` : `🔒 ${theme.price} XP`}
                     </Button>

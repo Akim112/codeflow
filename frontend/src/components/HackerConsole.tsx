@@ -186,9 +186,7 @@ ${nextRank ? `До ${nextRank.name}: ${nextRank.min - currentXP} XP` : 'Макс
           sounds.success();
           response = `[■■■■■■■■■■] 100%
 ВЗЛОМ УСПЕШЕН! ...шутка. Это всего лишь терминал.
-Но +10 XP за находчивость!`;
-          const hackXP = Number(localStorage.getItem('userXP') || '0') + 10;
-          localStorage.setItem('userXP', String(hackXP));
+XP начисляется только за прохождение миссий на сервере.`;
           type = 'success';
           break;
 
@@ -240,7 +238,7 @@ ${nextRank ? `До ${nextRank.name}: ${nextRank.min - currentXP} XP` : 'Макс
 
   return (
     <Box p="xs" style={{ fontFamily: 'monospace', fontSize: '12px', height: '100%' }}>
-      <ScrollArea h={120} viewportRef={scrollRef}>
+      <ScrollArea h={160} viewportRef={scrollRef}>
         {history.map((item, i) => (
           <Box key={i} mb={4}>
             {item.input && (
@@ -261,16 +259,21 @@ ${nextRank ? `До ${nextRank.name}: ${nextRank.min - currentXP} XP` : 'Макс
         value={input}
         onChange={(e) => setInput(e.target.value)}
         onKeyDown={handleCommand}
+        leftSectionWidth={20}
         styles={{ 
           input: { 
             color: '#00ff41', 
-            padding: 0, 
+            paddingLeft: '22px',
             minHeight: 'auto',
             fontFamily: 'monospace',
             fontSize: '12px'
-          } 
+          },
+          section: {
+            width: '20px',
+            marginLeft: '2px',
+          }
         }}
-        leftSection={<Text c="green" size="xs">$</Text>}
+        leftSection={<Text c="green" size="xs" ff="monospace">$</Text>}
       />
     </Box>
   );

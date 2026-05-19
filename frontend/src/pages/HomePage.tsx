@@ -7,21 +7,57 @@ import { useEffect, useState } from 'react';
 import { MatrixRain } from '../components/MatrixRain';
 import { ParticleBackground } from '../components/ParticleBackground';
 import { GlitchText } from '../components/GlitchText';
+import { usersApi } from '../api/users';
+import { progressApi, type UserProgressSummary } from '../api/progress';
+import { achievementsApi } from '../api/achievements';
 
 const HomePage = () => {
   const [userXP, setUserXP] = useState(0);
   const [showContent, setShowContent] = useState(false);
+  const [completedCount, setCompletedCount] = useState(0);
+  const [achievementsCount, setAchievementsCount] = useState(0);
+  const [themesCount, setThemesCount] = useState(0);
 
   useEffect(() => {
-    setUserXP(Number(localStorage.getItem('userXP')) || 0);
     const timer = setTimeout(() => setShowContent(true), 500);
+
+    const loadData = async () => {
+      try {
+        const user = await usersApi.getMe();
+        setUserXP(user.totalXp);
+        localStorage.setItem('userXP', String(user.totalXp));
+        localStorage.setItem('user', JSON.stringify(user));
+      } catch {
+        setUserXP(Number(localStorage.getItem('userXP')) || 0);
+      }
+
+      try {
+        const progress: UserProgressSummary = await progressApi.getMyProgress();
+        setCompletedCount(progress.completedLessonsCount);
+        localStorage.setItem('completedLessons', JSON.stringify(progress.completedLessonIds));
+      } catch {
+        setCompletedCount(JSON.parse(localStorage.getItem('completedLessons') || '[]').length);
+      }
+
+      try {
+        const myAchievements = await achievementsApi.getMyAchievements();
+        setAchievementsCount(myAchievements.length);
+        localStorage.setItem('unlockedAchievements', JSON.stringify(myAchievements.map(a => a.achievementId)));
+      } catch {
+        setAchievementsCount(JSON.parse(localStorage.getItem('unlockedAchievements') || '[]').length);
+      }
+
+      setThemesCount(JSON.parse(localStorage.getItem('ownedThemes') || '["classic"]').length);
+    };
+
+    loadData();
     return () => clearTimeout(timer);
   }, []);
 
   const stats = [
-    { label: 'Миссий пройдено', value: JSON.parse(localStorage.getItem('completedLessons') || '[]').length, icon: IconCode },
-    { label: 'Достижений', value: JSON.parse(localStorage.getItem('unlockedAchievements') || '[]').length, icon: IconTrophy },
-    { label: 'Тем куплено', value: JSON.parse(localStorage.getItem('ownedThemes') || '["classic"]').length, icon: IconShield },
+    { label: 'Миссий пройдено', value: completedCount, icon: IconCode },
+    { label: 'Достижений', value: achievementsCount, icon: IconTrophy },
+    { label: 'Тем куплено', value: themesCount, icon: IconShield },
   ];
 
   const containerVariants = {
@@ -95,23 +131,23 @@ const HomePage = () => {
                     filter: 'blur(40px)',
                   }}
                 />
-                
-                <Title 
-                  className="glitch neon-glow" 
-                  data-text="[ CODEFLOW ]" 
-                  order={1} 
-                  style={{ 
-                    fontSize: 'clamp(2.5rem, 8vw, 5rem)', 
+
+                <Title
+                  className="glitch neon-glow"
+                  data-text="[ CODEFLOW ]"
+                  order={1}
+                  style={{
+                    fontSize: 'clamp(2.5rem, 8vw, 5rem)',
                     textAlign: 'center',
                     fontFamily: 'Orbitron, sans-serif',
                     letterSpacing: '0.1em',
                     position: 'relative',
                   }}
                 >
-                  <Typewriter 
-                    words={["[ CODEFLOW ]"]} 
-                    cursor 
-                    cursorStyle="_" 
+                  <Typewriter
+                    words={["[ CODEFLOW ]"]}
+                    cursor
+                    cursorStyle="_"
                     typeSpeed={100}
                   />
                 </Title>
@@ -148,16 +184,16 @@ const HomePage = () => {
 
             {/* ОПИСАНИЕ */}
             <motion.div variants={itemVariants}>
-              <Text 
-                size="xl" 
-                c="dimmed" 
-                maw={700} 
-                ta="center" 
+              <Text
+                size="xl"
+                c="dimmed"
+                maw={700}
+                ta="center"
                 style={{ lineHeight: 1.8 }}
               >
-                Ты — последняя надежда <Text span fw={700} c="cyan">сопротивления</Text>. 
-                Проникни в сеть <Text span fw={700} c="red" className="warning-flash">OmniCorp</Text> и 
-                разрушь систему изнутри. Овладей <Text span fw={700} c="green">Python</Text>, 
+                Ты — последняя надежда <Text span fw={700} c="cyan">сопротивления</Text>.
+                Проникни в сеть <Text span fw={700} c="red" className="warning-flash">OmniCorp</Text> и
+                разрушь систему изнутри. Овладей <Text span fw={700} c="green">Python</Text>,
                 взломай защиту и стань <Text span fw={700} c="yellow">легендой</Text>.
               </Text>
             </motion.div>
@@ -168,9 +204,9 @@ const HomePage = () => {
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
               >
-                <Button 
-                  component={Link} 
-                  to="/courses" 
+                <Button
+                  component={Link}
+                  to="/courses"
                   size="xl"
                   leftSection={<IconRocket size={24} />}
                   className="electric-border"
@@ -182,6 +218,14 @@ const HomePage = () => {
                       border: 'none',
                       boxShadow: '0 0 30px rgba(0,255,65,0.4)',
                       transition: 'all 0.3s',
+                      overflow: 'visible',
+                    },
+                    label: {                      // ← добавить весь этот блок
+                      whiteSpace: 'nowrap',
+                      overflow: 'visible',
+                    },
+                    inner: {                      // ← и это
+                      overflow: 'visible',
                     }
                   }}
                 >
@@ -193,28 +237,25 @@ const HomePage = () => {
             {/* СТАТИСТИКА */}
             <motion.div variants={itemVariants} style={{ width: '100%' }}>
               <SimpleGrid cols={{ base: 1, sm: 3 }} spacing="lg" mt="xl">
-                {stats.map((stat, idx) => (
-                  <motion.div
+                {stats.map((stat) => (
+                  <Card
                     key={stat.label}
-                    initial={{ opacity: 0, scale: 0.8 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    transition={{ delay: 0.5 + idx * 0.1 }}
+                    withBorder
+                    p="lg"
+                    style={{
+                      textAlign: 'center',
+                      background: 'rgba(0, 255, 65, 0.03)',
+                      border: '1px solid rgba(0, 255, 65, 0.15)',
+                    }}
                   >
-                    <Card
-                      withBorder
-                      p="lg"
-                      className="cyber-card"
-                      style={{ textAlign: 'center' }}
-                    >
-                      <stat.icon size={32} color="var(--neon-green)" style={{ marginBottom: 10 }} />
-                      <Text size="2rem" fw={700} c="green" className="data-stream">
-                        {stat.value}
-                      </Text>
-                      <Text size="xs" c="dimmed" tt="uppercase" mt="xs">
-                        {stat.label}
-                      </Text>
-                    </Card>
-                  </motion.div>
+                    <stat.icon size={32} color="var(--neon-green)" style={{ marginBottom: 10 }} />
+                    <Text size="2rem" fw={700} c="green" style={{ textShadow: '0 0 15px rgba(0,255,65,0.5)' }}>
+                      {stat.value}
+                    </Text>
+                    <Text size="xs" c="dimmed" tt="uppercase" mt="xs">
+                      {stat.label}
+                    </Text>
+                  </Card>
                 ))}
               </SimpleGrid>
             </motion.div>
@@ -233,22 +274,22 @@ const HomePage = () => {
                     whileHover={{ scale: 1.05, y: -5 }}
                     whileTap={{ scale: 0.95 }}
                   >
-                    <Card 
-                      component={Link} 
-                      to={item.to} 
-                      withBorder 
-                      p="lg" 
+                    <Card
+                      component={Link}
+                      to={item.to}
+                      withBorder
+                      p="lg"
                       className="cyber-card"
-                      style={{ 
-                        cursor: 'pointer', 
+                      style={{
+                        cursor: 'pointer',
                         textAlign: 'center',
                         textDecoration: 'none',
                       }}
                     >
-                      <item.icon 
-                        size={28} 
-                        color={`var(--mantine-color-${item.color}-6)`} 
-                        style={{ marginBottom: 8 }} 
+                      <item.icon
+                        size={28}
+                        color={`var(--mantine-color-${item.color}-6)`}
+                        style={{ marginBottom: 8 }}
                       />
                       <Text fw={700} size="sm">{item.label}</Text>
                     </Card>

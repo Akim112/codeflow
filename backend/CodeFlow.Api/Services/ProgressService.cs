@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using CodeFlow.Api.Config;
 using CodeFlow.Api.Data;
 using CodeFlow.Api.DTOs;
 using CodeFlow.Api.Models;
@@ -90,6 +91,83 @@ public class ProgressService : IProgressService
             xpEarned,
             request.WasCleanRun
         );
+    }
+
+    public async Task<PurchaseHintResponseDto?> PurchaseHintAsync(Guid userId, PurchaseHintRequest request, CancellationToken ct = default)
+    {
+        if (request.HintLevel is not (1 or 2)) return null;
+
+        var lesson = await _db.Lessons.FindAsync(new object[] { request.LessonId }, ct);
+        if (lesson == null) return null;
+
+        var price = request.HintLevel == 1 ? 50 : 150;
+        var hintText = request.HintLevel == 1 ? lesson.Hint : lesson.Hint2;
+        if (string.IsNullOrWhiteSpace(hintText)) return null;
+
+        var user = await _db.Users.FirstOrDefaultAsync(u => u.Id == userId, ct);
+        if (user == null) return null;
+        if (user.TotalXp < price) return null;
+
+        user.TotalXp -= price;
+        await _db.SaveChangesAsync(ct);
+        return new PurchaseHintResponseDto(user.TotalXp, request.HintLevel, hintText);
+    }
+
+    public async Task<XpBalanceDto?> ApplyMoralChoiceAsync(Guid userId, MoralChoiceRequest request, CancellationToken ct = default)
+    {
+        var user = await _db.Users.FirstOrDefaultAsync(u => u.Id == userId, ct);
+        if (user == null) return null;
+        if (string.IsNullOrWhiteSpace(request.FactionId)) return null;
+
+        var lesson = await _db.Lessons.FindAsync(new object[] { request.LessonId }, ct);
+        if (lesson == null || !lesson.IsBoss) return null;
+
+        var alreadyChosen = await _db.UserMoralChoices.AnyAsync(
+            c => c.UserId == userId && c.LessonId == request.LessonId, ct);
+        if (alreadyChosen) return null;
+
+        var factionExists = await _db.Factions.AnyAsync(f => f.Id == request.FactionId, ct);
+        if (!factionExists) return null;
+
+        if (!MoralChoiceConfig.TryGetRewards(lesson.Chapter, request.FactionId, out var xpBonus, out var reputationBonus))
+            return null;
+
+        user.TotalXp += xpBonus;
+        _db.UserMoralChoices.Add(new UserMoralChoice
+        {
+            UserId = userId,
+            LessonId = request.LessonId,
+            FactionId = request.FactionId,
+            ChosenAtUtc = DateTime.UtcNow
+        });
+
+        await AddReputationAsync(userId, request.FactionId, reputationBonus, ct);
+        await RecalculateAndGrantAchievementsAsync(userId, ct);
+        await _db.SaveChangesAsync(ct);
+        return new XpBalanceDto(user.TotalXp);
+    }
+
+    public async Task<bool> ResetProgressAsync(Guid userId, CancellationToken ct = default)
+    {
+        var user = await _db.Users
+            .Include(u => u.Progress)
+            .Include(u => u.Achievements)
+            .Include(u => u.Reputation)
+            .Include(u => u.OwnedShopItems)
+            .Include(u => u.Notifications)
+            .FirstOrDefaultAsync(u => u.Id == userId, ct);
+        if (user == null) return false;
+
+        user.TotalXp = 0;
+        _db.UserProgress.RemoveRange(user.Progress);
+        _db.UserAchievements.RemoveRange(user.Achievements);
+        _db.UserReputations.RemoveRange(user.Reputation);
+        _db.UserNotifications.RemoveRange(user.Notifications);
+        _db.UserShopItems.RemoveRange(user.OwnedShopItems.Where(i => i.ShopItemId != "classic"));
+        var moralChoices = await _db.UserMoralChoices.Where(c => c.UserId == userId).ToListAsync(ct);
+        _db.UserMoralChoices.RemoveRange(moralChoices);
+        await _db.SaveChangesAsync(ct);
+        return true;
     }
 
     private async Task AwardReputationAsync(Guid userId, int lessonId, bool wasCleanCode, CancellationToken ct)
